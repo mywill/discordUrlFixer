@@ -22,7 +22,7 @@ const client = new Client({
   ],
 });
 
-client.once("ready", (c) => {
+client.once("clientReady", (c) => {
   console.log(`Logged in as ${c.user.tag}`);
 });
 

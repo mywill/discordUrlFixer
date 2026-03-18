@@ -16,12 +16,11 @@ export class TwitterFixer implements EmbedFixer {
 
     let fixedUrl = parsed.toString();
 
-    const language = request.serverConfig.twitter?.language;
+    const language = request.serverConfig.twitter?.language ?? "en";
     if (language) {
-      fixedUrl = fixedUrl.replace(
-        /^(https?:\/\/fxtwitter\.com)\//,
-        `$1/${language}/`,
-      );
+      const url = new URL(fixedUrl);
+      url.pathname = url.pathname.replace(/\/?$/, `/${language}`);
+      fixedUrl = url.toString();
     }
 
     return { url: fixedUrl, source: "twitter" };

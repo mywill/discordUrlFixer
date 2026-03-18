@@ -27,20 +27,20 @@ describe("XFixer", () => {
   });
 
   describe("fix", () => {
-    it("swaps domain to fixupx.com", () => {
+    it("swaps domain to fixupx.com with default en suffix", () => {
       const result = fixer.fix({
         url: "https://x.com/user/status/123",
         serverConfig: {},
       });
-      expect(result.url).toBe("https://fixupx.com/user/status/123");
+      expect(result.url).toBe("https://fixupx.com/user/status/123/en");
     });
 
-    it("preserves the full URL path", () => {
+    it("preserves query string with default en suffix", () => {
       const result = fixer.fix({
         url: "https://x.com/elonmusk/status/1234567890?s=20",
         serverConfig: {},
       });
-      expect(result.url).toBe("https://fixupx.com/elonmusk/status/1234567890?s=20");
+      expect(result.url).toBe("https://fixupx.com/elonmusk/status/1234567890/en?s=20");
     });
 
     it("handles www.x.com", () => {
@@ -48,21 +48,29 @@ describe("XFixer", () => {
         url: "https://www.x.com/user/status/123",
         serverConfig: {},
       });
-      expect(result.url).toBe("https://fixupx.com/user/status/123");
+      expect(result.url).toBe("https://fixupx.com/user/status/123/en");
     });
 
-    it("inserts language prefix when configured", () => {
+    it("appends language suffix when configured", () => {
       const result = fixer.fix({
         url: "https://x.com/user/status/123",
         serverConfig: { twitter: { language: "en" } },
       });
-      expect(result.url).toBe("https://fixupx.com/en/user/status/123");
+      expect(result.url).toBe("https://fixupx.com/user/status/123/en");
     });
 
-    it("works without language config", () => {
+    it("defaults to en without language config", () => {
       const result = fixer.fix({
         url: "https://x.com/user/status/123",
         serverConfig: { twitter: {} },
+      });
+      expect(result.url).toBe("https://fixupx.com/user/status/123/en");
+    });
+
+    it("omits language prefix when opted out with empty string", () => {
+      const result = fixer.fix({
+        url: "https://x.com/user/status/123",
+        serverConfig: { twitter: { language: "" } },
       });
       expect(result.url).toBe("https://fixupx.com/user/status/123");
     });

@@ -22,12 +22,23 @@ export function createMessageHandler(registry: FixerRegistry, configRepo: Config
 
     const reply = results.map((r) => r.url).join("\n");
 
+    const botMember = message.guild?.members.me;
+    const canSuppressEmbeds = botMember && message.channel.isTextBased() && 'permissionsFor' in message.channel
+      ? message.channel.permissionsFor(botMember)?.has("ManageMessages")
+      : false;
+
+    if (!canSuppressEmbeds) {
+      console.warn("Missing MANAGE_MESSAGES permission — cannot suppress embeds in", message.guild?.name);
+    }
+
     const [suppressResult, replyResult] = await Promise.allSettled([
-      message.suppressEmbeds(true),
+      canSuppressEmbeds ? message.suppressEmbeds(true) : Promise.resolve(null),
       message.reply(reply),
     ]);
 
-    if (suppressResult.status === "rejected") {
+    if (suppressResult.status === "fulfilled" && suppressResult.value !== null) {
+      console.log("Suppressed embeds for message", message.id);
+    } else if (suppressResult.status === "rejected") {
       console.error("Failed to suppress embeds:", suppressResult.reason);
     }
     if (replyResult.status === "rejected") {

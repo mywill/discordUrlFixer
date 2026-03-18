@@ -31,20 +31,20 @@ describe("TwitterFixer", () => {
   });
 
   describe("fix", () => {
-    it("swaps domain to fxtwitter.com", () => {
+    it("swaps domain to fxtwitter.com with default en suffix", () => {
       const result = fixer.fix({
         url: "https://twitter.com/user/status/123",
         serverConfig: {},
       });
-      expect(result.url).toBe("https://fxtwitter.com/user/status/123");
+      expect(result.url).toBe("https://fxtwitter.com/user/status/123/en");
     });
 
-    it("preserves the full URL path", () => {
+    it("preserves query string with default en suffix", () => {
       const result = fixer.fix({
         url: "https://twitter.com/elonmusk/status/1234567890?s=20",
         serverConfig: {},
       });
-      expect(result.url).toBe("https://fxtwitter.com/elonmusk/status/1234567890?s=20");
+      expect(result.url).toBe("https://fxtwitter.com/elonmusk/status/1234567890/en?s=20");
     });
 
     it("handles www.twitter.com", () => {
@@ -52,29 +52,37 @@ describe("TwitterFixer", () => {
         url: "https://www.twitter.com/user/status/123",
         serverConfig: {},
       });
-      expect(result.url).toBe("https://fxtwitter.com/user/status/123");
+      expect(result.url).toBe("https://fxtwitter.com/user/status/123/en");
     });
 
-    it("inserts language prefix when configured", () => {
+    it("appends language suffix when configured", () => {
       const result = fixer.fix({
         url: "https://twitter.com/user/status/123",
         serverConfig: { twitter: { language: "en" } },
       });
-      expect(result.url).toBe("https://fxtwitter.com/en/user/status/123");
+      expect(result.url).toBe("https://fxtwitter.com/user/status/123/en");
     });
 
-    it("inserts Japanese language prefix", () => {
+    it("appends Japanese language suffix", () => {
       const result = fixer.fix({
         url: "https://twitter.com/user/status/123",
         serverConfig: { twitter: { language: "ja" } },
       });
-      expect(result.url).toBe("https://fxtwitter.com/ja/user/status/123");
+      expect(result.url).toBe("https://fxtwitter.com/user/status/123/ja");
     });
 
-    it("works without language config", () => {
+    it("defaults to en without language config", () => {
       const result = fixer.fix({
         url: "https://twitter.com/user/status/123",
         serverConfig: { twitter: {} },
+      });
+      expect(result.url).toBe("https://fxtwitter.com/user/status/123/en");
+    });
+
+    it("omits language prefix when opted out with empty string", () => {
+      const result = fixer.fix({
+        url: "https://twitter.com/user/status/123",
+        serverConfig: { twitter: { language: "" } },
       });
       expect(result.url).toBe("https://fxtwitter.com/user/status/123");
     });
