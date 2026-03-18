@@ -1,0 +1,26 @@
+{
+  "name": "twitter-fixer",
+  "version": "1.0.0",
+  "description": "Discord bot that fixes Twitter/X and Bluesky embeds",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write src/ tests/"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.25.1",
+    "dotenv": "^17.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "prettier": "^3.8.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
+  }
+}
