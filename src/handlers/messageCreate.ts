@@ -33,7 +33,7 @@ export function createMessageHandler(registry: FixerRegistry, configRepo: Config
 
     const [suppressResult, replyResult] = await Promise.allSettled([
       canSuppressEmbeds ? message.suppressEmbeds(true) : Promise.resolve(null),
-      message.reply(reply),
+      message.reply({ content: reply, allowedMentions: { repliedUser: false } }),
     ]);
 
     if (suppressResult.status === "fulfilled" && suppressResult.value !== null) {
