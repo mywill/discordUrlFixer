@@ -61,6 +61,8 @@ pnpm start
 
 ### 4. Run with Docker/Podman
 
+#### With podman-compose
+
 ```bash
 # Build and start
 podman-compose up -d
@@ -73,6 +75,48 @@ podman-compose up -d --build
 
 # Stop
 podman-compose down
+```
+
+#### Without compose
+
+```bash
+# Build
+podman build -t twitter-fixer .
+
+# Run
+podman run -d \
+  --name twitter-fixer \
+  --restart unless-stopped \
+  --env-file .env \
+  -v ./server-config.json:/app/server-config.json \
+  twitter-fixer
+
+# View logs
+podman logs -f twitter-fixer
+
+# Restart without rebuilding
+podman restart twitter-fixer
+
+# Stop and remove
+podman stop twitter-fixer && podman rm twitter-fixer
+```
+
+#### Updating with minimal downtime
+
+Build the new image while the bot is still running, then swap quickly:
+
+```bash
+# Build first (bot stays running during this step)
+podman build -t twitter-fixer .
+
+# Swap — only a few seconds of downtime
+podman stop twitter-fixer && podman rm twitter-fixer
+podman run -d \
+  --name twitter-fixer \
+  --restart unless-stopped \
+  --env-file .env \
+  -v ./server-config.json:/app/server-config.json \
+  twitter-fixer
 ```
 
 The container auto-restarts on crash via `restart: unless-stopped`. Edit `server-config.json` on the host — it's mounted as a volume, so changes apply on next restart without rebuilding.
