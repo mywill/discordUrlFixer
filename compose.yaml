@@ -1,0 +1,8 @@
+services:
+  twitter-fixer:
+    build: .
+    container_name: twitter-fixer
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./server-config.json:/app/server-config.json

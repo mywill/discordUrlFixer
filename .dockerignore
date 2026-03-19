@@ -1,0 +1,9 @@
+node_modules/
+.pnpm-store/
+dist/
+.env
+.git/
+tests/
+*.md
+.prettierrc
+vitest.config.ts
