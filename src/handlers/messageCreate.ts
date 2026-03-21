@@ -1,10 +1,11 @@
 import { Message } from "discord.js";
 import { FixerRegistry } from "../fixers/registry";
 import { ConfigRepository } from "../config-repo/types";
+import { ReplyTracker } from "../reply-tracker/types";
 
 const URL_REGEX = /https?:\/\/\S+/g;
 
-export function createMessageHandler(registry: FixerRegistry, configRepo: ConfigRepository) {
+export function createMessageHandler(registry: FixerRegistry, configRepo: ConfigRepository, replyTracker: ReplyTracker) {
   return async (message: Message) => {
     if (message.author.bot) return;
     if (message.content.toLowerCase().includes("fxignore")) return;
@@ -41,7 +42,9 @@ export function createMessageHandler(registry: FixerRegistry, configRepo: Config
     } else if (suppressResult.status === "rejected") {
       console.error("Failed to suppress embeds:", suppressResult.reason);
     }
-    if (replyResult.status === "rejected") {
+    if (replyResult.status === "fulfilled") {
+      replyTracker.track(message.id, replyResult.value.id);
+    } else {
       console.error("Failed to reply:", replyResult.reason);
     }
   };

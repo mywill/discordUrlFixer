@@ -8,8 +8,11 @@ import { BlueskyFixer } from "./fixers/blueskyFixer";
 import { InstagramFixer } from "./fixers/instagramFixer";
 import { TikTokFixer } from "./fixers/tiktokFixer";
 import { createMessageHandler } from "./handlers/messageCreate";
+import { createMessageDeleteHandler, createMessageDeleteBulkHandler } from "./handlers/messageDelete";
+import { InMemoryReplyTracker } from "./reply-tracker/inMemoryReplyTracker";
 
 const configRepo = new JsonConfigRepository();
+const replyTracker = new InMemoryReplyTracker();
 
 const registry = new FixerRegistry();
 registry.register(new TwitterFixer());
@@ -30,6 +33,8 @@ client.once("clientReady", (c) => {
   console.log(`Logged in as ${c.user.tag}`);
 });
 
-client.on("messageCreate", createMessageHandler(registry, configRepo));
+client.on("messageCreate", createMessageHandler(registry, configRepo, replyTracker));
+client.on("messageDelete", createMessageDeleteHandler(replyTracker));
+client.on("messageDeleteBulk", createMessageDeleteBulkHandler(replyTracker));
 
 client.login(BOT_TOKEN);
