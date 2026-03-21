@@ -7,6 +7,9 @@ A Discord bot that automatically replaces Twitter, X, and Bluesky links with emb
 | Twitter  | `twitter.com` | `fxtwitter.com` |
 | X        | `x.com` | `fixupx.com` |
 | Bluesky  | `bsky.app` | `fxbsky.app` |
+| Instagram | `instagram.com` | `ddinstagram.com` |
+| TikTok   | `tiktok.com` | `tnktok.com` |
+| Threads  | `threads.net` | `fixthreads.net` |
 
 ## Features
 
