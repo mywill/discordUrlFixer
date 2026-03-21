@@ -1,4 +1,4 @@
-import { Message, PartialMessage, Collection, Snowflake } from "discord.js";
+import { Message, PartialMessage, ReadonlyCollection, Snowflake } from "discord.js";
 import { ReplyTracker } from "../reply-tracker/types";
 
 async function tryDeleteBotReply(
@@ -26,7 +26,7 @@ export function createMessageDeleteHandler(replyTracker: ReplyTracker) {
 }
 
 export function createMessageDeleteBulkHandler(replyTracker: ReplyTracker) {
-  return async (messages: Collection<Snowflake, Message | PartialMessage>) => {
+  return async (messages: ReadonlyCollection<Snowflake, Message | PartialMessage>) => {
     for (const message of messages.values()) {
       await tryDeleteBotReply(message, replyTracker);
     }
