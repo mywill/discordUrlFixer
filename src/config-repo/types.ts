@@ -3,6 +3,7 @@ export interface ServerConfig {
     language?: string;
   };
   bluesky?: {};
+  useMarkdownLinksAsShortener?: boolean;
 }
 
 export interface ConfigRepository {

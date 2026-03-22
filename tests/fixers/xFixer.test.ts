@@ -80,7 +80,7 @@ describe("XFixer", () => {
         url: "https://x.com/user/status/123",
         serverConfig: {},
       });
-      expect(result.source).toBe("x");
+      expect(result.source).toBe("twitter");
     });
   });
 });

@@ -19,6 +19,6 @@ export class XFixer implements EmbedFixer {
       url.pathname = url.pathname.replace(/\/?$/, `/${language}`);
       fixedUrl = url.toString();
     }
-    return { url: fixedUrl, source: "x" };
+    return { url: fixedUrl, source: "twitter" };
   }
 }

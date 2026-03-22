@@ -21,7 +21,10 @@ export function createMessageHandler(registry: FixerRegistry, configRepo: Config
 
     if (results.length === 0) return;
 
-    const reply = results.map((r) => r.url).join("\n");
+    const useMarkdown = serverConfig.useMarkdownLinksAsShortener !== false;
+    const reply = results
+      .map((r) => useMarkdown ? `[${r.source}](${r.url})` : r.url)
+      .join("\n");
 
     const botMember = message.guild?.members.me;
     const canSuppressEmbeds = botMember && message.channel.isTextBased() && 'permissionsFor' in message.channel
