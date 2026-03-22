@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "lint": "prettier --check src/ tests/",
     "format": "prettier --write src/ tests/"
   },
   "license": "MIT",

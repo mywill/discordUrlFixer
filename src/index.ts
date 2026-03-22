@@ -7,7 +7,10 @@ import { XFixer } from "./fixers/xFixer";
 import { BlueskyFixer } from "./fixers/blueskyFixer";
 import { TikTokFixer } from "./fixers/tiktokFixer";
 import { createMessageHandler } from "./handlers/messageCreate";
-import { createMessageDeleteHandler, createMessageDeleteBulkHandler } from "./handlers/messageDelete";
+import {
+  createMessageDeleteHandler,
+  createMessageDeleteBulkHandler,
+} from "./handlers/messageDelete";
 import { InMemoryReplyTracker } from "./reply-tracker/inMemoryReplyTracker";
 
 const configRepo = new JsonConfigRepository();

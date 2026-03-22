@@ -6,7 +6,10 @@ import {
   createMessageDeleteBulkHandler,
 } from "../../src/handlers/messageDelete";
 
-function createFakeMessage(id: string, options?: { fetchThrows?: boolean; deleteThrows?: boolean }) {
+function createFakeMessage(
+  id: string,
+  options?: { fetchThrows?: boolean; deleteThrows?: boolean },
+) {
   const replyMessage = {
     delete: options?.deleteThrows
       ? vi.fn().mockRejectedValue(new Error("Missing Permissions"))

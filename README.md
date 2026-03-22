@@ -1,20 +1,21 @@
-# Twitter Fixer
+# Discord URL Fixer
 
-A Discord bot that automatically replaces Twitter, X, and Bluesky links with embed-friendly alternatives so previews actually show up in chat.
+A Discord bot that automatically replaces social media links with embed-friendly alternatives so previews actually show up in chat.
 
 | Platform | Original | Replaced with |
 |----------|----------|---------------|
 | Twitter  | `twitter.com` | `fxtwitter.com` |
 | X        | `x.com` | `fixupx.com` |
 | Bluesky  | `bsky.app` | `fxbsky.app` |
-| Instagram | `instagram.com` | `ddinstagram.com` |
 | TikTok   | `tiktok.com` | `tnktok.com` |
 
 ## Features
 
 - Automatically detects and fixes links in messages
 - Suppresses the original broken embeds when the bot has `Manage Messages` permission
+- Deletes bot replies when the original message is deleted
 - Per-server language configuration for Twitter/X translation (defaults to `en`)
+- Optional markdown masked links for shorter replies (`[source](url)`)
 - Add `fxignore` anywhere in a message to skip processing
 
 ## Setup
@@ -38,92 +39,46 @@ A Discord bot that automatically replaces Twitter, X, and Bluesky links with emb
    - Embed Links
 4. Copy the generated URL and open it in your browser to invite the bot to your server
 
-Or build the URL manually — replace `YOUR_CLIENT_ID` with your application's client ID (found on the **General Information** tab):
+### 3. Configure
+
+Copy `.env.example` to `.env` and add your bot token:
 
 ```
-https://discord.com/oauth2/authorize?client_id=1483636877540982804&permissions=92160&scope=bot
+BOT_TOKEN=your-bot-token-here
 ```
 
-### 3. Install and run
+### 4. Run with Docker Compose (recommended)
 
 ```bash
-# Install dependencies
+docker compose up -d
+```
+
+The compose file pulls from `ghcr.io/mywill/discordurlfixer:latest`.
+
+Files mounted into the container:
+- `.env` — bot token (required)
+- `server-config.json` — per-server settings (optional)
+
+```bash
+# View logs
+docker compose logs -f
+
+# Update to latest image
+docker compose pull && docker compose up -d
+
+# Stop
+docker compose down
+```
+
+### 5. Run from source
+
+```bash
 pnpm install
-
-# Copy .env.example and add your bot token
-cp .env.example .env
-
-# Development
-pnpm dev
-
-# Production
 pnpm build
 pnpm start
 ```
 
-### 4. Run with Docker/Podman
-
-#### With podman-compose
-
-```bash
-# Build and start
-podman-compose up -d
-
-# View logs
-podman logs -f twitter-fixer
-
-# Rebuild after code changes
-podman-compose up -d --build
-
-# Stop
-podman-compose down
-```
-
-#### Without compose
-
-```bash
-# Build
-podman build -t twitter-fixer .
-
-# Run
-podman run -d \
-  --name twitter-fixer \
-  --restart unless-stopped \
-  --env-file .env \
-  -v ./server-config.json:/app/server-config.json \
-  twitter-fixer
-
-# View logs
-podman logs -f twitter-fixer
-
-# Restart without rebuilding
-podman restart twitter-fixer
-
-# Stop and remove
-podman stop twitter-fixer && podman rm twitter-fixer
-```
-
-#### Updating with minimal downtime
-
-Build the new image while the bot is still running, then swap quickly:
-
-```bash
-# Build first (bot stays running during this step)
-podman build -t twitter-fixer .
-
-# Swap — only a few seconds of downtime
-podman stop twitter-fixer && podman rm twitter-fixer
-podman run -d \
-  --name twitter-fixer \
-  --restart unless-stopped \
-  --env-file .env \
-  -v ./server-config.json:/app/server-config.json \
-  twitter-fixer
-```
-
-The container auto-restarts on crash via `restart: unless-stopped`. Edit `server-config.json` on the host — it's mounted as a volume, so changes apply on next restart without rebuilding.
-
-### 5. Run with pm2 (optional)
+### 6. Run with pm2 (optional)
 
 ```bash
 pnpm build
@@ -141,15 +96,22 @@ Per-server settings live in `server-config.json`, keyed by guild ID:
   "123456789012345678": {
     "twitter": {
       "language": "ja"
-    }
+    },
+    "useMarkdownLinksAsShortener": false
   }
 }
 ```
 
-- **`twitter.language`** — appended as a suffix to Twitter/X URLs for translation (e.g. `.../status/123/ja`). Defaults to `"en"`. Set to `""` to disable.
+| Option | Default | Description |
+|---|---|---|
+| `twitter.language` | `"en"` | Suffix appended to Twitter/X URLs for translation. Set to `""` to disable. |
+| `useMarkdownLinksAsShortener` | `true` | Format replies as `[source](url)` for shorter messages. Set to `false` for raw URLs. |
 
-## Testing
+## Development
 
 ```bash
-pnpm test
+pnpm dev          # Run with ts-node
+pnpm test         # Run tests
+pnpm lint         # Check formatting
+pnpm format       # Fix formatting
 ```

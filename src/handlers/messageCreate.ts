@@ -5,7 +5,11 @@ import { ReplyTracker } from "../reply-tracker/types";
 
 const URL_REGEX = /https?:\/\/\S+/g;
 
-export function createMessageHandler(registry: FixerRegistry, configRepo: ConfigRepository, replyTracker: ReplyTracker) {
+export function createMessageHandler(
+  registry: FixerRegistry,
+  configRepo: ConfigRepository,
+  replyTracker: ReplyTracker,
+) {
   return async (message: Message) => {
     if (message.author.bot) return;
     if (message.content.toLowerCase().includes("fxignore")) return;
@@ -22,17 +26,19 @@ export function createMessageHandler(registry: FixerRegistry, configRepo: Config
     if (results.length === 0) return;
 
     const useMarkdown = serverConfig.useMarkdownLinksAsShortener !== false;
-    const reply = results
-      .map((r) => useMarkdown ? `[${r.source}](${r.url})` : r.url)
-      .join("\n");
+    const reply = results.map((r) => (useMarkdown ? `[${r.source}](${r.url})` : r.url)).join("\n");
 
     const botMember = message.guild?.members.me;
-    const canSuppressEmbeds = botMember && message.channel.isTextBased() && 'permissionsFor' in message.channel
-      ? message.channel.permissionsFor(botMember)?.has("ManageMessages")
-      : false;
+    const canSuppressEmbeds =
+      botMember && message.channel.isTextBased() && "permissionsFor" in message.channel
+        ? message.channel.permissionsFor(botMember)?.has("ManageMessages")
+        : false;
 
     if (!canSuppressEmbeds) {
-      console.warn("Missing MANAGE_MESSAGES permission — cannot suppress embeds in", message.guild?.name);
+      console.warn(
+        "Missing MANAGE_MESSAGES permission — cannot suppress embeds in",
+        message.guild?.name,
+      );
     }
 
     const [suppressResult, replyResult] = await Promise.allSettled([

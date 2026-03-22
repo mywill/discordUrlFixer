@@ -1,6 +1,6 @@
 services:
   twitter-fixer:
-    build: .
+    image: ghcr.io/mywill/discordurlfixer:latest
     container_name: twitter-fixer
     restart: unless-stopped
     env_file: .env
