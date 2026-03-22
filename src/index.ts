@@ -5,7 +5,6 @@ import { FixerRegistry } from "./fixers/registry";
 import { TwitterFixer } from "./fixers/twitterFixer";
 import { XFixer } from "./fixers/xFixer";
 import { BlueskyFixer } from "./fixers/blueskyFixer";
-import { InstagramFixer } from "./fixers/instagramFixer";
 import { TikTokFixer } from "./fixers/tiktokFixer";
 import { createMessageHandler } from "./handlers/messageCreate";
 import { createMessageDeleteHandler, createMessageDeleteBulkHandler } from "./handlers/messageDelete";
@@ -18,7 +17,6 @@ const registry = new FixerRegistry();
 registry.register(new TwitterFixer());
 registry.register(new XFixer());
 registry.register(new BlueskyFixer());
-registry.register(new InstagramFixer());
 registry.register(new TikTokFixer());
 
 const client = new Client({
