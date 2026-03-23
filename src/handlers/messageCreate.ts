@@ -28,28 +28,16 @@ export function createMessageHandler(
     const useMarkdown = serverConfig.useMarkdownLinksAsShortener !== false;
     const reply = results.map((r) => (useMarkdown ? `[${r.source}](${r.url})` : r.url)).join("\n");
 
-    const botMember = message.guild?.members.me;
-    const canSuppressEmbeds =
-      botMember && message.channel.isTextBased() && "permissionsFor" in message.channel
-        ? message.channel.permissionsFor(botMember)?.has("ManageMessages")
-        : false;
-
-    if (!canSuppressEmbeds) {
-      console.warn(
-        "Missing MANAGE_MESSAGES permission — cannot suppress embeds in",
-        message.guild?.name,
-      );
-    }
-
+    const suppressPromise = Promise.resolve().then(() => message.suppressEmbeds(true));
     const [suppressResult, replyResult] = await Promise.allSettled([
-      canSuppressEmbeds ? message.suppressEmbeds(true) : Promise.resolve(null),
+      suppressPromise,
       message.reply({ content: reply, allowedMentions: { repliedUser: false } }),
     ]);
 
-    if (suppressResult.status === "fulfilled" && suppressResult.value !== null) {
+    if (suppressResult.status === "fulfilled") {
       console.log("Suppressed embeds for message", message.id);
-    } else if (suppressResult.status === "rejected") {
-      console.error("Failed to suppress embeds:", suppressResult.reason);
+    } else {
+      console.error(`Failed to suppress embeds in ${message.guild?.name}:`, suppressResult.reason);
     }
     if (replyResult.status === "fulfilled") {
       replyTracker.track(message.id, replyResult.value.id);
