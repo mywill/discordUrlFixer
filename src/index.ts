@@ -1,6 +1,9 @@
 import { Client, GatewayIntentBits } from "discord.js";
 import { BOT_TOKEN } from "./config";
-import { JsonConfigRepository } from "./config-repo/jsonConfigRepository";
+import { createDatabase } from "./database/connection";
+import { seedIfEmpty } from "./database/seed";
+import { DrizzleConfigRepository } from "./config-repo/drizzleConfigRepository";
+import { DrizzleReplyTracker } from "./reply-tracker/drizzleReplyTracker";
 import { FixerRegistry } from "./fixers/registry";
 import { TwitterFixer } from "./fixers/twitterFixer";
 import { XFixer } from "./fixers/xFixer";
@@ -11,10 +14,12 @@ import {
   createMessageDeleteHandler,
   createMessageDeleteBulkHandler,
 } from "./handlers/messageDelete";
-import { InMemoryReplyTracker } from "./reply-tracker/inMemoryReplyTracker";
 
-const configRepo = new JsonConfigRepository();
-const replyTracker = new InMemoryReplyTracker();
+const { db, sqlite } = createDatabase();
+seedIfEmpty(db);
+
+const configRepo = new DrizzleConfigRepository(db);
+const replyTracker = new DrizzleReplyTracker(db);
 
 const registry = new FixerRegistry();
 registry.register(new TwitterFixer());
@@ -37,5 +42,11 @@ client.once("clientReady", (c) => {
 client.on("messageCreate", createMessageHandler(registry, configRepo, replyTracker));
 client.on("messageDelete", createMessageDeleteHandler(replyTracker));
 client.on("messageDeleteBulk", createMessageDeleteBulkHandler(replyTracker));
+
+process.on("SIGTERM", () => {
+  replyTracker.destroy();
+  sqlite.close();
+  client.destroy();
+});
 
 client.login(BOT_TOKEN);

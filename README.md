@@ -13,7 +13,7 @@ A Discord bot that automatically replaces social media links with embed-friendly
 
 - Automatically detects and fixes links in messages
 - Suppresses the original broken embeds when the bot has `Manage Messages` permission
-- Deletes bot replies when the original message is deleted
+- Deletes bot replies when the original message is deleted (within 24 hours)
 - Per-server language configuration for Twitter/X translation (defaults to `en`)
 - Optional markdown masked links for shorter replies (`[source](url)`)
 - Add `fxignore` anywhere in a message to skip processing
@@ -47,27 +47,28 @@ Copy `.env.example` to `.env` and add your bot token:
 BOT_TOKEN=your-bot-token-here
 ```
 
-### 4. Run with Docker Compose (recommended)
+### 4. Run with podman Compose (recommended)
 
 ```bash
-docker compose up -d
+podman compose up -d
 ```
 
 The compose file pulls from `ghcr.io/mywill/discordurlfixer:latest`.
 
-Files mounted into the container:
+Files and directories mounted into the container:
 - `.env` — bot token (required)
-- `server-config.json` — per-server settings (optional)
+- `server-config.json` — per-server settings, used for initial seed on first boot (optional)
+- `data/` — SQLite database directory (persistent storage)
 
 ```bash
 # View logs
-docker compose logs -f
+podman compose logs -f
 
 # Update to latest image
-docker compose pull && docker compose up -d
+podman compose pull && podman compose up -d
 
 # Stop
-docker compose down
+podman compose down
 ```
 
 ### 5. Run from source
@@ -89,7 +90,9 @@ pm2 startup
 
 ## Configuration
 
-Per-server settings live in `server-config.json`, keyed by guild ID:
+Per-server settings are stored in SQLite (`data/bot.db`). On first boot, the database is seeded from `server-config.json` if present. After that, config lives in the database.
+
+The config shape per server (JSON format for reference):
 
 ```json
 {
@@ -114,4 +117,5 @@ pnpm dev          # Run with ts-node
 pnpm test         # Run tests
 pnpm lint         # Check formatting
 pnpm format       # Fix formatting
+pnpm db:generate  # Generate Drizzle migration after schema changes
 ```
