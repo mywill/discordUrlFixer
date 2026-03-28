@@ -6,8 +6,8 @@ export NVM_DIR="$HOME/.nvm"
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
 . "$NVM_DIR/nvm.sh"
 
-nvm install 22
-nvm alias default 22
+nvm install 24
+nvm alias default 24
 
 # --- pnpm ---
 corepack enable

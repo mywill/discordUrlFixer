@@ -1,5 +1,5 @@
 # Build stage
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 RUN apk add --no-cache build-base python3
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
@@ -10,7 +10,7 @@ COPY src/ src/
 RUN pnpm build
 
 # Runtime stage
-FROM node:22-alpine
+FROM node:24-alpine
 WORKDIR /app
 RUN apk add --no-cache libstdc++
 RUN corepack enable && corepack prepare pnpm@latest --activate
