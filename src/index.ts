@@ -1,9 +1,10 @@
-import { Client, GatewayIntentBits } from "discord.js";
+import { Client, GatewayIntentBits, Partials } from "discord.js";
 import { BOT_TOKEN } from "./config";
 import { createDatabase } from "./database/connection";
 import { seedIfEmpty } from "./database/seed";
 import { DrizzleConfigRepository } from "./config-repo/drizzleConfigRepository";
 import { DrizzleReplyTracker } from "./reply-tracker/drizzleReplyTracker";
+import { DrizzleEmbedSuppressor } from "./embed-suppressor/drizzleEmbedSuppressor";
 import { FixerRegistry } from "./fixers/registry";
 import { TwitterFixer } from "./fixers/twitterFixer";
 import { XFixer } from "./fixers/xFixer";
@@ -20,6 +21,7 @@ seedIfEmpty(db);
 
 const configRepo = new DrizzleConfigRepository(db);
 const replyTracker = new DrizzleReplyTracker(db);
+const embedSuppressor = new DrizzleEmbedSuppressor(db);
 
 const registry = new FixerRegistry();
 registry.register(new TwitterFixer());
@@ -33,17 +35,24 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
   ],
+  partials: [Partials.Message],
 });
 
-client.once("clientReady", (c) => {
+client.once("clientReady", async (c) => {
   console.log(`Logged in as ${c.user.tag}`);
+  await embedSuppressor.resumePending(c);
 });
 
-client.on("messageCreate", createMessageHandler(registry, configRepo, replyTracker));
+client.on(
+  "messageCreate",
+  createMessageHandler(registry, configRepo, replyTracker, embedSuppressor),
+);
+client.on("messageUpdate", (old, updated) => embedSuppressor.handleMessageUpdate(old, updated));
 client.on("messageDelete", createMessageDeleteHandler(replyTracker));
 client.on("messageDeleteBulk", createMessageDeleteBulkHandler(replyTracker));
 
 process.on("SIGTERM", () => {
+  embedSuppressor.destroy();
   replyTracker.destroy();
   sqlite.close();
   client.destroy();

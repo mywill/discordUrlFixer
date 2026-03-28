@@ -10,3 +10,9 @@ export const replyTracker = sqliteTable("reply_tracker", {
   replyMessageId: text("reply_message_id").notNull(),
   expiresAt: integer("expires_at").notNull(),
 });
+
+export const failedSuppresses = sqliteTable("failed_suppresses", {
+  messageId: text("message_id").primaryKey(),
+  channelId: text("channel_id").notNull(),
+  createdAt: integer("created_at").notNull(),
+});

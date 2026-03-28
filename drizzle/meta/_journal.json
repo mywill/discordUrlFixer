@@ -8,6 +8,13 @@
       "when": 1774212764941,
       "tag": "0000_steady_black_widow",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1774713719286,
+      "tag": "0001_nervous_selene",
+      "breakpoints": true
     }
   ]
 }
