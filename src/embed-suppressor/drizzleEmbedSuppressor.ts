@@ -100,9 +100,8 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
 
     try {
       await this.attemptSuppress(message, [...RETRY_DELAYS]);
-      this.untrack(message.id);
       console.log(
-        `Suppressed embeds for message ${message.id} in ${formatChannelContext(message)}`,
+        `Suppress flag set for message ${message.id} in ${formatChannelContext(message)}, awaiting confirmation`,
       );
     } catch (error) {
       if (is50013(error)) {
@@ -135,21 +134,28 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
   ): Promise<void> {
     if (!this.pending.has(newMessage.id)) return;
 
-    this.untrack(newMessage.id);
+    const channelName = "name" in newMessage.channel ? newMessage.channel.name : "unknown";
 
-    if (newMessage.flags?.has(MessageFlags.SuppressEmbeds)) return;
+    // Flag already set — embeds are confirmed suppressed
+    if (newMessage.flags?.has(MessageFlags.SuppressEmbeds)) {
+      this.untrack(newMessage.id);
+      console.log(`Confirmed embeds suppressed for ${newMessage.id} in #${channelName}`);
+      return;
+    }
+
+    // No embeds yet — keep waiting for Discord to finish parsing URLs
     if (!newMessage.embeds || newMessage.embeds.length === 0) return;
 
+    // Embeds appeared without the suppress flag — suppress them now
+    this.untrack(newMessage.id);
     try {
       const full = newMessage.partial ? await newMessage.fetch() : newMessage;
       if (full.flags.has(MessageFlags.SuppressEmbeds)) return;
       await full.suppressEmbeds(true);
-      const channelName = "name" in full.channel ? full.channel.name : "unknown";
       console.log(
         `Suppressed embeds via messageUpdate for ${full.id} in #${channelName} [${full.channel.id}]`,
       );
     } catch (error) {
-      const channelName = "name" in newMessage.channel ? newMessage.channel.name : "unknown";
       console.warn(
         `Failed to suppress embeds via messageUpdate for ${newMessage.id} in #${channelName} [${newMessage.channel.id}]:`,
         error,

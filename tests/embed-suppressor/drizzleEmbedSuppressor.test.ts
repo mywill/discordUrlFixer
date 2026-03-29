@@ -87,7 +87,7 @@ describe("DrizzleEmbedSuppressor", () => {
   });
 
   describe("suppress", () => {
-    it("suppresses embeds on first attempt", async () => {
+    it("sets suppress flag on first attempt", async () => {
       const message = createFakeMessage("msg-1");
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
@@ -96,7 +96,7 @@ describe("DrizzleEmbedSuppressor", () => {
       await promise;
 
       expect(message.suppressEmbeds).toHaveBeenCalledTimes(1);
-      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Suppressed embeds"));
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Suppress flag set"));
       logSpy.mockRestore();
     });
 
@@ -221,7 +221,7 @@ describe("DrizzleEmbedSuppressor", () => {
       errorSpy.mockRestore();
     });
 
-    it("removes DB entry on success", async () => {
+    it("keeps DB entry after suppress flag set (awaits messageUpdate confirmation)", async () => {
       const message = createFakeMessage("msg-1");
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
@@ -230,8 +230,8 @@ describe("DrizzleEmbedSuppressor", () => {
       await promise;
 
       const rows = db.select().from(failedSuppresses).all();
-      expect(rows).toHaveLength(0);
-      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Untracked suppress"));
+      expect(rows).toHaveLength(1);
+      expect(rows[0].messageId).toBe("msg-1");
       logSpy.mockRestore();
     });
 
@@ -310,7 +310,7 @@ describe("DrizzleEmbedSuppressor", () => {
       warnSpy.mockRestore();
     });
 
-    it("skips messages with SuppressEmbeds flag already set", async () => {
+    it("confirms and untracks when SuppressEmbeds flag is set", async () => {
       const error = createError50013();
       const original = createFakeMessage("msg-1", {
         suppressEmbeds: vi.fn().mockRejectedValue(error),
@@ -329,11 +329,14 @@ describe("DrizzleEmbedSuppressor", () => {
       await suppressor.handleMessageUpdate({} as any, updated);
 
       expect(updated.suppressEmbeds).not.toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Confirmed embeds suppressed"));
+      const rows = db.select().from(failedSuppresses).all();
+      expect(rows).toHaveLength(0);
       logSpy.mockRestore();
       warnSpy.mockRestore();
     });
 
-    it("skips messages with no embeds", async () => {
+    it("keeps pending when no embeds yet (waits for URL parsing)", async () => {
       const error = createError50013();
       const original = createFakeMessage("msg-1", {
         suppressEmbeds: vi.fn().mockRejectedValue(error),
@@ -352,8 +355,32 @@ describe("DrizzleEmbedSuppressor", () => {
       await suppressor.handleMessageUpdate({} as any, updated);
 
       expect(updated.suppressEmbeds).not.toHaveBeenCalled();
+      // Entry stays in DB — still waiting for embeds to appear
+      const rows = db.select().from(failedSuppresses).all();
+      expect(rows).toHaveLength(1);
       logSpy.mockRestore();
       warnSpy.mockRestore();
+    });
+
+    it("re-suppresses when embeds appear after initial suppress succeeded", async () => {
+      const original = createFakeMessage("msg-1");
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      const suppressPromise = suppressor.suppress(original);
+      await vi.advanceTimersByTimeAsync(300);
+      await suppressPromise;
+
+      // Message stays pending after suppress flag set
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(1);
+
+      // Discord fires messageUpdate with new embeds (URL parsing completed)
+      const updated = createFakeMessage("msg-1");
+
+      await suppressor.handleMessageUpdate({} as any, updated);
+
+      expect(updated.suppressEmbeds).toHaveBeenCalledWith(true);
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
+      logSpy.mockRestore();
     });
 
     it("fetches full message when partial", async () => {
