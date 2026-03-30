@@ -3,6 +3,9 @@ export interface ServerConfig {
     language?: string;
   };
   bluesky?: {};
+  reddit?: {
+    includeOldRedditLink?: boolean;
+  };
   useMarkdownLinksAsShortener?: boolean;
 }
 

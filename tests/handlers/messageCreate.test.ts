@@ -195,6 +195,31 @@ describe("messageCreate handler", () => {
     expect(tracker.get("msg-1")).toBe("reply-msg-1");
   });
 
+  it("formats secondary URL with middle dot separator", async () => {
+    const registry = {
+      processUrls: vi.fn().mockReturnValue([
+        {
+          url: "https://vxreddit.com/r/funny/comments/abc/title/",
+          source: "reddit",
+          secondaryUrl: "https://old.reddit.com/r/funny/comments/abc/title/",
+          secondarySource: "old",
+        },
+      ]),
+    } as any;
+
+    const message = createFakeMessage("msg-1", {
+      content: "https://reddit.com/r/funny/comments/abc/title/",
+    });
+    const handler = createMessageHandler(registry, createMockConfigRepo(), tracker, suppressor);
+    await handler(message);
+
+    expect(message.reply).toHaveBeenCalledWith({
+      content:
+        "[reddit](https://vxreddit.com/r/funny/comments/abc/title/) - [old](<https://old.reddit.com/r/funny/comments/abc/title/>)",
+      allowedMentions: { repliedUser: false },
+    });
+  });
+
   it("does not track reply when reply fails", async () => {
     const message = createFakeMessage("msg-1", {
       reply: vi.fn().mockRejectedValue(new Error("Cannot send")),

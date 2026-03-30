@@ -8,6 +8,9 @@ export interface FixRequest {
 export interface FixResult {
   url: string;
   source?: string;
+  // secondary is used for additional redirects that will not render embeds ie Old reddit
+  secondaryUrl?: string;
+  secondarySource?: string;
 }
 
 export interface EmbedFixer {

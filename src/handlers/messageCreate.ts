@@ -28,7 +28,16 @@ export function createMessageHandler(
     if (results.length === 0) return;
 
     const useMarkdown = serverConfig.useMarkdownLinksAsShortener !== false;
-    const reply = results.map((r) => (useMarkdown ? `[${r.source}](${r.url})` : r.url)).join("\n");
+    const reply = results
+      .map((r) => {
+        if (!useMarkdown) return r.url;
+        let text = `[${r.source}](${r.url})`;
+        if (r.secondaryUrl) {
+          text += ` - [${r.secondarySource}](<${r.secondaryUrl}>)`;
+        }
+        return text;
+      })
+      .join("\n");
 
     const [, replyResult] = await Promise.allSettled([
       suppressor.suppress(message),

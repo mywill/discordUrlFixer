@@ -10,6 +10,7 @@ import { TwitterFixer } from "./fixers/twitterFixer";
 import { XFixer } from "./fixers/xFixer";
 import { BlueskyFixer } from "./fixers/blueskyFixer";
 import { TikTokFixer } from "./fixers/tiktokFixer";
+import { RedditFixer } from "./fixers/redditFixer";
 import { createMessageHandler } from "./handlers/messageCreate";
 import {
   createMessageDeleteHandler,
@@ -28,6 +29,7 @@ registry.register(new TwitterFixer());
 registry.register(new XFixer());
 registry.register(new BlueskyFixer());
 registry.register(new TikTokFixer());
+registry.register(new RedditFixer());
 
 const client = new Client({
   intents: [
