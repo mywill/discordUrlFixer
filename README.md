@@ -8,6 +8,7 @@ A Discord bot that automatically replaces social media links with embed-friendly
 | X        | `x.com` | `fixupx.com` |
 | Bluesky  | `bsky.app` | `fxbsky.app` |
 | TikTok   | `tiktok.com` | `tnktok.com` |
+| Reddit   | `reddit.com` | `vxreddit.com` |
 
 ## Features
 
@@ -108,6 +109,7 @@ The config shape per server (JSON format for reference):
 | Option | Default | Description |
 |---|---|---|
 | `twitter.language` | `"en"` | Suffix appended to Twitter/X URLs for translation. Set to `""` to disable. |
+| `reddit.includeOldRedditLink` | `true` | Append an `old.reddit.com` link alongside the embed-fixed URL. Set to `false` to disable. |
 | `useMarkdownLinksAsShortener` | `true` | Format replies as `[source](url)` for shorter messages. Set to `false` for raw URLs. |
 
 ## Development
