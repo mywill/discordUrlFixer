@@ -87,57 +87,31 @@ describe("DrizzleEmbedSuppressor", () => {
   });
 
   describe("suppress", () => {
-    it("sets suppress flag on first attempt", async () => {
+    it("sets suppress flag immediately", async () => {
       const message = createFakeMessage("msg-1");
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-      const promise = suppressor.suppress(message);
-      await vi.advanceTimersByTimeAsync(300);
-      await promise;
+      await suppressor.suppress(message);
 
       expect(message.suppressEmbeds).toHaveBeenCalledTimes(1);
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Suppress flag set"));
       logSpy.mockRestore();
     });
 
-    it("retries on first 50013 and succeeds on second attempt", async () => {
-      const error = createError50013();
-      const message = createFakeMessage("msg-1", {
-        suppressEmbeds: vi.fn().mockRejectedValueOnce(error).mockResolvedValueOnce(undefined),
-      });
-      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-
-      const promise = suppressor.suppress(message);
-      await vi.advanceTimersByTimeAsync(300);
-      await vi.advanceTimersByTimeAsync(700);
-      await promise;
-
-      expect(message.suppressEmbeds).toHaveBeenCalledTimes(2);
-      logSpy.mockRestore();
-    });
-
-    it("retries up to three times on consecutive 50013 errors", async () => {
-      const error = createError50013();
-      const message = createFakeMessage("msg-1", {
-        suppressEmbeds: vi
-          .fn()
-          .mockRejectedValueOnce(error)
-          .mockRejectedValueOnce(error)
-          .mockResolvedValueOnce(undefined),
-      });
-      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-
-      const promise = suppressor.suppress(message);
-      await vi.advanceTimersByTimeAsync(300);
-      await vi.advanceTimersByTimeAsync(700);
-      await vi.advanceTimersByTimeAsync(1000);
-      await promise;
-
-      expect(message.suppressEmbeds).toHaveBeenCalledTimes(3);
-      logSpy.mockRestore();
-    });
-
     it("persists to DB immediately when suppress starts", async () => {
+      const message = createFakeMessage("msg-1");
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      await suppressor.suppress(message);
+
+      const rows = db.select().from(failedSuppresses).all();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].messageId).toBe("msg-1");
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Tracking suppress"));
+      logSpy.mockRestore();
+    });
+
+    it("keeps DB entry on 50013 error", async () => {
       const error = createError50013();
       const message = createFakeMessage("msg-1", {
         suppressEmbeds: vi.fn().mockRejectedValue(error),
@@ -145,57 +119,26 @@ describe("DrizzleEmbedSuppressor", () => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-      const promise = suppressor.suppress(message);
-
-      // DB entry exists before any retry completes
-      const rows = db.select().from(failedSuppresses).all();
-      expect(rows).toHaveLength(1);
-      expect(rows[0].messageId).toBe("msg-1");
-      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Tracking suppress"));
-
-      await vi.advanceTimersByTimeAsync(300);
-      await vi.advanceTimersByTimeAsync(700);
-      await vi.advanceTimersByTimeAsync(1000);
-      await promise;
-      logSpy.mockRestore();
-      warnSpy.mockRestore();
-    });
-
-    it("keeps DB entry when all 50013 retries fail", async () => {
-      const error = createError50013();
-      const message = createFakeMessage("msg-1");
-      message.suppressEmbeds = vi.fn().mockRejectedValue(error);
-      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-      const promise = suppressor.suppress(message);
-      await vi.advanceTimersByTimeAsync(300);
-      await vi.advanceTimersByTimeAsync(700);
-      await vi.advanceTimersByTimeAsync(1000);
-      await promise;
+      await suppressor.suppress(message);
 
       const rows = db.select().from(failedSuppresses).all();
       expect(rows).toHaveLength(1);
       expect(rows[0].messageId).toBe("msg-1");
-      expect(rows[0].channelId).toBe("channel-1");
       logSpy.mockRestore();
       warnSpy.mockRestore();
     });
 
-    it("logs diagnostics when all attempts fail with 50013", async () => {
+    it("logs diagnostics on 50013 error", async () => {
       const error = createError50013();
-      const message = createFakeMessage("msg-1");
-      message.suppressEmbeds = vi.fn().mockRejectedValue(error);
+      const message = createFakeMessage("msg-1", {
+        suppressEmbeds: vi.fn().mockRejectedValue(error),
+      });
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-      const promise = suppressor.suppress(message);
-      await vi.advanceTimersByTimeAsync(300);
-      await vi.advanceTimersByTimeAsync(700);
-      await vi.advanceTimersByTimeAsync(1000);
-      await promise;
+      await suppressor.suppress(message);
 
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("all attempts failed"));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Missing Permissions"));
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Channel type: GuildText"));
       logSpy.mockRestore();
       warnSpy.mockRestore();
@@ -210,9 +153,7 @@ describe("DrizzleEmbedSuppressor", () => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-      const promise = suppressor.suppress(message);
-      await vi.advanceTimersByTimeAsync(300);
-      await promise;
+      await suppressor.suppress(message);
 
       expect(message.suppressEmbeds).toHaveBeenCalledTimes(1);
       const rows = db.select().from(failedSuppresses).all();
@@ -225,9 +166,7 @@ describe("DrizzleEmbedSuppressor", () => {
       const message = createFakeMessage("msg-1");
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-      const promise = suppressor.suppress(message);
-      await vi.advanceTimersByTimeAsync(300);
-      await promise;
+      await suppressor.suppress(message);
 
       const rows = db.select().from(failedSuppresses).all();
       expect(rows).toHaveLength(1);
@@ -243,14 +182,61 @@ describe("DrizzleEmbedSuppressor", () => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-      const promise = suppressor.suppress(message);
-      await vi.advanceTimersByTimeAsync(300);
-      await vi.advanceTimersByTimeAsync(700);
-      await vi.advanceTimersByTimeAsync(1000);
-
-      await expect(promise).resolves.toBeUndefined();
+      await expect(suppressor.suppress(message)).resolves.toBeUndefined();
       logSpy.mockRestore();
       warnSpy.mockRestore();
+    });
+
+    it("fires insurance suppress after delay", async () => {
+      const message = createFakeMessage("msg-1");
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      await suppressor.suppress(message);
+      expect(message.suppressEmbeds).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1500);
+
+      // Insurance call fires because message is still pending
+      expect(message.suppressEmbeds).toHaveBeenCalledTimes(2);
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Insurance suppress fired"));
+      logSpy.mockRestore();
+    });
+
+    it("skips insurance suppress if already confirmed", async () => {
+      const message = createFakeMessage("msg-1");
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      await suppressor.suppress(message);
+      expect(message.suppressEmbeds).toHaveBeenCalledTimes(1);
+
+      // Confirm via messageUpdate before insurance fires
+      const updated = createFakeMessage("msg-1", { hasSuppressFlag: true, hasEmbeds: true });
+      await suppressor.handleMessageUpdate({} as any, updated);
+
+      await vi.advanceTimersByTimeAsync(1500);
+
+      // Insurance should not have fired — only the initial call + the defensive re-suppress
+      expect(message.suppressEmbeds).toHaveBeenCalledTimes(1);
+      logSpy.mockRestore();
+    });
+
+    it("does not schedule insurance on non-50013 error", async () => {
+      const error = new Error("Unknown Message");
+      (error as any).code = 10008;
+      const message = createFakeMessage("msg-1", {
+        suppressEmbeds: vi.fn().mockRejectedValue(error),
+      });
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      await suppressor.suppress(message);
+
+      await vi.advanceTimersByTimeAsync(1500);
+
+      // Only the initial failed call, no insurance
+      expect(message.suppressEmbeds).toHaveBeenCalledTimes(1);
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
     });
   });
 
@@ -263,11 +249,7 @@ describe("DrizzleEmbedSuppressor", () => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-      const suppressPromise = suppressor.suppress(original);
-      await vi.advanceTimersByTimeAsync(300);
-      await vi.advanceTimersByTimeAsync(700);
-      await vi.advanceTimersByTimeAsync(1000);
-      await suppressPromise;
+      await suppressor.suppress(original);
 
       const updated = createFakeMessage("msg-1");
 
@@ -294,11 +276,7 @@ describe("DrizzleEmbedSuppressor", () => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-      const suppressPromise = suppressor.suppress(original);
-      await vi.advanceTimersByTimeAsync(300);
-      await vi.advanceTimersByTimeAsync(700);
-      await vi.advanceTimersByTimeAsync(1000);
-      await suppressPromise;
+      await suppressor.suppress(original);
 
       const updated = createFakeMessage("msg-1");
 
@@ -310,7 +288,7 @@ describe("DrizzleEmbedSuppressor", () => {
       warnSpy.mockRestore();
     });
 
-    it("confirms and untracks when SuppressEmbeds flag is set", async () => {
+    it("re-suppresses defensively and untracks when flag and embeds are set", async () => {
       const error = createError50013();
       const original = createFakeMessage("msg-1", {
         suppressEmbeds: vi.fn().mockRejectedValue(error),
@@ -318,22 +296,75 @@ describe("DrizzleEmbedSuppressor", () => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-      const suppressPromise = suppressor.suppress(original);
-      await vi.advanceTimersByTimeAsync(300);
-      await vi.advanceTimersByTimeAsync(700);
-      await vi.advanceTimersByTimeAsync(1000);
-      await suppressPromise;
+      await suppressor.suppress(original);
 
       const updated = createFakeMessage("msg-1", { hasSuppressFlag: true });
 
       await suppressor.handleMessageUpdate({} as any, updated);
 
-      expect(updated.suppressEmbeds).not.toHaveBeenCalled();
+      expect(updated.suppressEmbeds).toHaveBeenCalledWith(true);
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Confirmed embeds suppressed"));
       const rows = db.select().from(failedSuppresses).all();
       expect(rows).toHaveLength(0);
       logSpy.mockRestore();
       warnSpy.mockRestore();
+    });
+
+    it("keeps tracking when flag set but no embeds yet", async () => {
+      const original = createFakeMessage("msg-1");
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      await suppressor.suppress(original);
+
+      const updated = createFakeMessage("msg-1", { hasSuppressFlag: true, hasEmbeds: false });
+
+      await suppressor.handleMessageUpdate({} as any, updated);
+
+      expect(updated.suppressEmbeds).not.toHaveBeenCalled();
+      const rows = db.select().from(failedSuppresses).all();
+      expect(rows).toHaveLength(1);
+      logSpy.mockRestore();
+    });
+
+    it("confirms after late embed appears with flag preserved", async () => {
+      const original = createFakeMessage("msg-1");
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      await suppressor.suppress(original);
+
+      // First update: flag set, no embeds yet — keep tracking
+      const update1 = createFakeMessage("msg-1", { hasSuppressFlag: true, hasEmbeds: false });
+      await suppressor.handleMessageUpdate({} as any, update1);
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(1);
+
+      // Second update: flag set AND embeds present — re-suppress defensively and confirm
+      const update2 = createFakeMessage("msg-1", { hasSuppressFlag: true, hasEmbeds: true });
+      await suppressor.handleMessageUpdate({} as any, update2);
+
+      expect(update2.suppressEmbeds).toHaveBeenCalledWith(true);
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Confirmed embeds suppressed"));
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
+      logSpy.mockRestore();
+    });
+
+    it("re-suppresses after late embed appears without flag", async () => {
+      const original = createFakeMessage("msg-1");
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      await suppressor.suppress(original);
+
+      // First update: flag set, no embeds yet — keep tracking
+      const update1 = createFakeMessage("msg-1", { hasSuppressFlag: true, hasEmbeds: false });
+      await suppressor.handleMessageUpdate({} as any, update1);
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(1);
+
+      // Second update: embeds appeared but flag no longer set — re-suppress
+      const update2 = createFakeMessage("msg-1", { hasSuppressFlag: false, hasEmbeds: true });
+      await suppressor.handleMessageUpdate({} as any, update2);
+
+      expect(update2.suppressEmbeds).toHaveBeenCalledWith(true);
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
+      logSpy.mockRestore();
     });
 
     it("keeps pending when no embeds yet (waits for URL parsing)", async () => {
@@ -344,18 +375,13 @@ describe("DrizzleEmbedSuppressor", () => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-      const suppressPromise = suppressor.suppress(original);
-      await vi.advanceTimersByTimeAsync(300);
-      await vi.advanceTimersByTimeAsync(700);
-      await vi.advanceTimersByTimeAsync(1000);
-      await suppressPromise;
+      await suppressor.suppress(original);
 
       const updated = createFakeMessage("msg-1", { hasEmbeds: false });
 
       await suppressor.handleMessageUpdate({} as any, updated);
 
       expect(updated.suppressEmbeds).not.toHaveBeenCalled();
-      // Entry stays in DB — still waiting for embeds to appear
       const rows = db.select().from(failedSuppresses).all();
       expect(rows).toHaveLength(1);
       logSpy.mockRestore();
@@ -366,11 +392,8 @@ describe("DrizzleEmbedSuppressor", () => {
       const original = createFakeMessage("msg-1");
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-      const suppressPromise = suppressor.suppress(original);
-      await vi.advanceTimersByTimeAsync(300);
-      await suppressPromise;
+      await suppressor.suppress(original);
 
-      // Message stays pending after suppress flag set
       expect(db.select().from(failedSuppresses).all()).toHaveLength(1);
 
       // Discord fires messageUpdate with new embeds (URL parsing completed)
@@ -391,11 +414,7 @@ describe("DrizzleEmbedSuppressor", () => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-      const suppressPromise = suppressor.suppress(original);
-      await vi.advanceTimersByTimeAsync(300);
-      await vi.advanceTimersByTimeAsync(700);
-      await vi.advanceTimersByTimeAsync(1000);
-      await suppressPromise;
+      await suppressor.suppress(original);
 
       const updated = createFakeMessage("msg-1", { isPartial: true });
 
@@ -406,7 +425,7 @@ describe("DrizzleEmbedSuppressor", () => {
       warnSpy.mockRestore();
     });
 
-    it("logs warning on suppress failure", async () => {
+    it("stays tracked when suppress via messageUpdate fails", async () => {
       const error50013 = createError50013();
       const original = createFakeMessage("msg-1", {
         suppressEmbeds: vi.fn().mockRejectedValue(error50013),
@@ -414,11 +433,7 @@ describe("DrizzleEmbedSuppressor", () => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-      const suppressPromise = suppressor.suppress(original);
-      await vi.advanceTimersByTimeAsync(300);
-      await vi.advanceTimersByTimeAsync(700);
-      await vi.advanceTimersByTimeAsync(1000);
-      await suppressPromise;
+      await suppressor.suppress(original);
 
       const updateError = new Error("Still no permissions");
       const updated = createFakeMessage("msg-1", {
@@ -431,6 +446,9 @@ describe("DrizzleEmbedSuppressor", () => {
         expect.stringContaining("Failed to suppress embeds via messageUpdate"),
         expect.anything(),
       );
+      // Stays tracked for next messageUpdate or sweep cleanup
+      const rows = db.select().from(failedSuppresses).all();
+      expect(rows).toHaveLength(1);
       logSpy.mockRestore();
       warnSpy.mockRestore();
     });
@@ -536,11 +554,7 @@ describe("DrizzleEmbedSuppressor", () => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-      const promise = suppressor.suppress(message);
-      await vi.advanceTimersByTimeAsync(300);
-      await vi.advanceTimersByTimeAsync(700);
-      await vi.advanceTimersByTimeAsync(1000);
-      await promise;
+      await suppressor.suppress(message);
 
       expect(db.select().from(failedSuppresses).all()).toHaveLength(1);
 

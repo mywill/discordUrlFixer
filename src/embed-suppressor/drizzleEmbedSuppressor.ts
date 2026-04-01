@@ -11,8 +11,9 @@ import { eq, lte } from "drizzle-orm";
 import { EmbedSuppressor } from "./types";
 import { failedSuppresses } from "../database/schema";
 
-const RETRY_DELAYS = [300, 700, 1000];
+const INSURANCE_SUPPRESS_DELAY_MS = 1500;
 const FAILED_SUPPRESS_TTL_MS = 5 * 60 * 1000;
+const SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
 const CHANNEL_TYPE_NAMES: Partial<Record<ChannelType, string>> = {
   [ChannelType.GuildText]: "GuildText",
@@ -91,7 +92,7 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
   private sweepInterval: ReturnType<typeof setInterval>;
 
   constructor(private db: BetterSQLite3Database) {
-    this.sweepInterval = setInterval(() => this.sweep(), 5 * 60 * 1000);
+    this.sweepInterval = setInterval(() => this.sweep(), SWEEP_INTERVAL_MS);
     this.sweepInterval.unref();
   }
 
@@ -99,7 +100,7 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
     this.track(message);
 
     try {
-      await this.attemptSuppress(message, [...RETRY_DELAYS]);
+      await message.suppressEmbeds(true);
       console.log(
         `Suppress flag set for message ${message.id} in ${formatChannelContext(message)}, awaiting confirmation`,
       );
@@ -107,25 +108,25 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
       if (is50013(error)) {
         const diagnostics = getPermissionDiagnostics(message);
         console.warn(
-          `Failed to suppress embeds in ${formatChannelContext(message)}: Missing Permissions (all attempts failed)\n${diagnostics}`,
+          `Failed to suppress embeds in ${formatChannelContext(message)}: Missing Permissions\n${diagnostics}`,
         );
       } else {
         this.untrack(message.id);
         console.error(`Failed to suppress embeds in ${formatChannelContext(message)}:`, error);
+        return;
       }
     }
-  }
 
-  private async attemptSuppress(message: Message, delays: number[]): Promise<void> {
-    await delay(delays[0]);
-    try {
-      await message.suppressEmbeds(true);
-    } catch (error) {
-      if (is50013(error) && delays.length > 1) {
-        return this.attemptSuppress(message, delays.slice(1));
+    // Delayed insurance: re-assert suppress after Discord's embed resolver has likely finished
+    delay(INSURANCE_SUPPRESS_DELAY_MS).then(async () => {
+      if (!this.pending.has(message.id)) return;
+      try {
+        await message.suppressEmbeds(true);
+        console.log(`Insurance suppress fired for ${message.id}`);
+      } catch {
+        // best effort — messageUpdate handler is the real safety net
       }
-      throw error;
-    }
+    });
   }
 
   async handleMessageUpdate(
@@ -136,10 +137,19 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
 
     const channelName = "name" in newMessage.channel ? newMessage.channel.name : "unknown";
 
-    // Flag already set — embeds are confirmed suppressed
+    // Flag set — re-suppress defensively once embeds are present (Discord race #4442)
     if (newMessage.flags?.has(MessageFlags.SuppressEmbeds)) {
-      this.untrack(newMessage.id);
-      console.log(`Confirmed embeds suppressed for ${newMessage.id} in #${channelName}`);
+      if (newMessage.embeds && newMessage.embeds.length > 0) {
+        try {
+          const full = newMessage.partial ? await newMessage.fetch() : newMessage;
+          await full.suppressEmbeds(true);
+        } catch {
+          // Flag already set — best effort re-assert
+        }
+        this.untrack(newMessage.id);
+        console.log(`Confirmed embeds suppressed for ${newMessage.id} in #${channelName}`);
+      }
+      // Flag set but no embeds yet — keep tracking
       return;
     }
 
@@ -147,15 +157,19 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
     if (!newMessage.embeds || newMessage.embeds.length === 0) return;
 
     // Embeds appeared without the suppress flag — suppress them now
-    this.untrack(newMessage.id);
     try {
       const full = newMessage.partial ? await newMessage.fetch() : newMessage;
-      if (full.flags.has(MessageFlags.SuppressEmbeds)) return;
+      if (full.flags.has(MessageFlags.SuppressEmbeds)) {
+        this.untrack(newMessage.id);
+        return;
+      }
       await full.suppressEmbeds(true);
+      this.untrack(newMessage.id);
       console.log(
         `Suppressed embeds via messageUpdate for ${full.id} in #${channelName} [${full.channel.id}]`,
       );
     } catch (error) {
+      // Stay tracked — next messageUpdate or sweep will handle cleanup
       console.warn(
         `Failed to suppress embeds via messageUpdate for ${newMessage.id} in #${channelName} [${newMessage.channel.id}]:`,
         error,
