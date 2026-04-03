@@ -23,7 +23,7 @@ export function createMessageHandler(
     if (!serverId) return;
 
     const serverConfig = configRepo.getServerConfig(serverId);
-    const results = registry.processUrls(urls, serverConfig);
+    const results = await registry.processUrls(urls, serverConfig);
 
     if (results.length === 0) return;
 

@@ -21,6 +21,10 @@ describe("RedditFixer", () => {
       expect(fixer.canHandle("https://new.reddit.com/r/funny/comments/abc123/title/")).toBe(true);
     });
 
+    it("returns true for /s/ URLs", () => {
+      expect(fixer.canHandle("https://www.reddit.com/r/MLS/s/2D9VJPDXNx")).toBe(true);
+    });
+
     it("returns false for redd.it shortlinks", () => {
       expect(fixer.canHandle("https://redd.it/abc123")).toBe(false);
     });
@@ -35,48 +39,48 @@ describe("RedditFixer", () => {
   });
 
   describe("fix", () => {
-    it("swaps domain to vxreddit.com", () => {
-      const result = fixer.fix({
+    it("swaps domain to vxreddit.com", async () => {
+      const result = await fixer.fix({
         url: "https://reddit.com/r/funny/comments/abc123/title/",
         serverConfig: {},
       });
       expect(result.url).toBe("https://vxreddit.com/r/funny/comments/abc123/title/");
     });
 
-    it("strips www subdomain", () => {
-      const result = fixer.fix({
+    it("strips www subdomain", async () => {
+      const result = await fixer.fix({
         url: "https://www.reddit.com/r/funny/comments/abc123/title/",
         serverConfig: {},
       });
       expect(result.url).toBe("https://vxreddit.com/r/funny/comments/abc123/title/");
     });
 
-    it("strips old subdomain", () => {
-      const result = fixer.fix({
+    it("strips old subdomain", async () => {
+      const result = await fixer.fix({
         url: "https://old.reddit.com/r/funny/comments/abc123/title/",
         serverConfig: {},
       });
       expect(result.url).toBe("https://vxreddit.com/r/funny/comments/abc123/title/");
     });
 
-    it("strips new subdomain", () => {
-      const result = fixer.fix({
+    it("strips new subdomain", async () => {
+      const result = await fixer.fix({
         url: "https://new.reddit.com/r/funny/comments/abc123/title/",
         serverConfig: {},
       });
       expect(result.url).toBe("https://vxreddit.com/r/funny/comments/abc123/title/");
     });
 
-    it("sets source to reddit", () => {
-      const result = fixer.fix({
+    it("sets source to reddit", async () => {
+      const result = await fixer.fix({
         url: "https://reddit.com/r/funny/comments/abc123/title/",
         serverConfig: {},
       });
       expect(result.source).toBe("reddit");
     });
 
-    it("includes old.reddit.com secondary URL by default", () => {
-      const result = fixer.fix({
+    it("includes old.reddit.com secondary URL by default", async () => {
+      const result = await fixer.fix({
         url: "https://reddit.com/r/funny/comments/abc123/title/",
         serverConfig: {},
       });
@@ -84,8 +88,8 @@ describe("RedditFixer", () => {
       expect(result.secondarySource).toBe("oldReddit");
     });
 
-    it("excludes secondary URL when config explicitly disabled", () => {
-      const result = fixer.fix({
+    it("excludes secondary URL when config explicitly disabled", async () => {
+      const result = await fixer.fix({
         url: "https://reddit.com/r/funny/comments/abc123/title/",
         serverConfig: { reddit: { includeOldRedditLink: false } },
       });
@@ -93,20 +97,33 @@ describe("RedditFixer", () => {
       expect(result.secondarySource).toBeUndefined();
     });
 
-    it("converts www.reddit.com to old.reddit.com in secondary URL", () => {
-      const result = fixer.fix({
+    it("converts www.reddit.com to old.reddit.com in secondary URL", async () => {
+      const result = await fixer.fix({
         url: "https://www.reddit.com/r/funny/comments/abc123/title/",
         serverConfig: { reddit: { includeOldRedditLink: true } },
       });
       expect(result.secondaryUrl).toBe("https://old.reddit.com/r/funny/comments/abc123/title/");
     });
 
-    it("preserves old.reddit.com in secondary URL when input was old", () => {
-      const result = fixer.fix({
+    it("preserves old.reddit.com in secondary URL when input was old", async () => {
+      const result = await fixer.fix({
         url: "https://old.reddit.com/r/funny/comments/abc123/title/",
         serverConfig: { reddit: { includeOldRedditLink: true } },
       });
       expect(result.secondaryUrl).toBe("https://old.reddit.com/r/funny/comments/abc123/title/");
+    });
+
+    it("resolves the correct URL for /s/ links and removes tracking", async () => {
+      const result = await fixer.fix({
+        url: "https://www.reddit.com/r/MLS/s/2D9VJPDXNx",
+        serverConfig: { reddit: { includeOldRedditLink: true } },
+      });
+      expect(result.secondaryUrl).toBe(
+        "https://old.reddit.com/r/MLS/comments/1sajlvv/video_from_the_inter_miami_sth_tour_of_nu_stadium/",
+      );
+      expect(result.url).toBe(
+        "https://vxreddit.com/r/MLS/comments/1sajlvv/video_from_the_inter_miami_sth_tour_of_nu_stadium/",
+      );
     });
   });
 });

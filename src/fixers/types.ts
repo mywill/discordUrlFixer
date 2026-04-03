@@ -15,5 +15,5 @@ export interface FixResult {
 
 export interface EmbedFixer {
   canHandle(url: string): boolean;
-  fix(request: FixRequest): FixResult;
+  fix(request: FixRequest): FixResult | Promise<FixResult>;
 }

@@ -13,48 +13,48 @@ function createMockFixer(domain: string, fixedDomain: string): EmbedFixer {
   };
 }
 
-describe("FixerRegistry", () => {
-  it("returns empty results for empty registry", () => {
+describe("FixerRegistry", async () => {
+  it("returns empty results for empty registry", async () => {
     const registry = new FixerRegistry();
-    const results = registry.processUrls(["https://twitter.com/test"], {});
+    const results = await registry.processUrls(["https://twitter.com/test"], {});
     expect(results).toEqual([]);
   });
 
-  it("matches a URL to the correct fixer", () => {
+  it("matches a URL to the correct fixer", async () => {
     const registry = new FixerRegistry();
     registry.register(createMockFixer("twitter.com", "fxtwitter.com"));
 
-    const results = registry.processUrls(["https://twitter.com/user/status/123"], {});
+    const results = await registry.processUrls(["https://twitter.com/user/status/123"], {});
     expect(results).toHaveLength(1);
     expect(results[0].url).toBe("https://fxtwitter.com/user/status/123");
   });
 
-  it("first matching fixer wins", () => {
+  it("first matching fixer wins", async () => {
     const registry = new FixerRegistry();
     const fixer1 = createMockFixer("twitter.com", "first.com");
     const fixer2 = createMockFixer("twitter.com", "second.com");
     registry.register(fixer1);
     registry.register(fixer2);
 
-    const results = registry.processUrls(["https://twitter.com/test"], {});
+    const results = await registry.processUrls(["https://twitter.com/test"], {});
     expect(results).toHaveLength(1);
     expect(results[0].url).toContain("first.com");
   });
 
-  it("returns no results for non-matching URLs", () => {
+  it("returns no results for non-matching URLs", async () => {
     const registry = new FixerRegistry();
     registry.register(createMockFixer("twitter.com", "fxtwitter.com"));
 
-    const results = registry.processUrls(["https://google.com"], {});
+    const results = await registry.processUrls(["https://google.com"], {});
     expect(results).toEqual([]);
   });
 
-  it("handles multiple URLs with mixed platforms", () => {
+  it("handles multiple URLs with mixed platforms", async () => {
     const registry = new FixerRegistry();
     registry.register(createMockFixer("twitter.com", "fxtwitter.com"));
     registry.register(createMockFixer("bsky.app", "fxbsky.app"));
 
-    const results = registry.processUrls(
+    const results = await registry.processUrls(
       ["https://twitter.com/user/123", "https://bsky.app/profile/user/post/789"],
       {},
     );
@@ -63,11 +63,11 @@ describe("FixerRegistry", () => {
     expect(results[1].url).toContain("fxbsky.app");
   });
 
-  it("deduplicates identical URLs", () => {
+  it("deduplicates identical URLs", async () => {
     const registry = new FixerRegistry();
     registry.register(createMockFixer("twitter.com", "fxtwitter.com"));
 
-    const results = registry.processUrls(
+    const results = await registry.processUrls(
       ["https://twitter.com/user/123", "https://twitter.com/user/123"],
       {},
     );

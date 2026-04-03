@@ -8,7 +8,7 @@ export class FixerRegistry {
     this.fixers.push(fixer);
   }
 
-  processUrls(urls: string[], serverConfig: ServerConfig): FixResult[] {
+  async processUrls(urls: string[], serverConfig: ServerConfig): Promise<FixResult[]> {
     const seen = new Set<string>();
     const results: FixResult[] = [];
 
@@ -18,7 +18,7 @@ export class FixerRegistry {
 
       for (const fixer of this.fixers) {
         if (fixer.canHandle(url)) {
-          results.push(fixer.fix({ url, serverConfig }));
+          results.push(await fixer.fix({ url, serverConfig }));
           break;
         }
       }
