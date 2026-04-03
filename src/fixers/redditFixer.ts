@@ -36,7 +36,10 @@ export class RedditFixer implements EmbedFixer {
       method: "HEAD",
       redirect: "manual", // or use 'follow' and check finalURL
     });
-    console.log(`made request for redirect for ${url} got ${JSON.stringify(response)}`);
+    // TODO make this better should not silently fail...
+    console.log(
+      `made request for redirect for ${url} got ${response.status} ${JSON.stringify(response.headers)}`,
+    );
     // Reddit returns 301/302 to the real permalink
     const realUrl = new URL(response.headers.get("location") || response.url);
     realUrl.search = "";
