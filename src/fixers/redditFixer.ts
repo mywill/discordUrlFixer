@@ -31,14 +31,16 @@ export class RedditFixer implements EmbedFixer {
 
   private async resolveAndFix(url: string): Promise<FixResult> {
     // HEAD request to follow redirect
+    console.log(`getting redirect for ${url}`);
     const response = await fetch(url, {
       method: "HEAD",
       redirect: "manual", // or use 'follow' and check finalURL
     });
-
+    console.log(`made request for redirect for ${url} got ${JSON.stringify(response)}`);
     // Reddit returns 301/302 to the real permalink
     const realUrl = new URL(response.headers.get("location") || response.url);
     realUrl.search = "";
+    console.log(`got redirect for ${url} resolves ${realUrl}`);
     // Now apply your transformations to the resolved URL
     const vxUrl = new URL(realUrl);
     vxUrl.hostname = "vxreddit.com";
