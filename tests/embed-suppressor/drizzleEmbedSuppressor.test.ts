@@ -194,7 +194,7 @@ describe("DrizzleEmbedSuppressor", () => {
       await suppressor.suppress(message);
       expect(message.suppressEmbeds).toHaveBeenCalledTimes(1);
 
-      await vi.advanceTimersByTimeAsync(1500);
+      await vi.advanceTimersByTimeAsync(2500);
 
       // Insurance call fires because message is still pending
       expect(message.suppressEmbeds).toHaveBeenCalledTimes(2);

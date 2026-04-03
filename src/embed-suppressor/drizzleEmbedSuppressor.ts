@@ -11,9 +11,9 @@ import { eq, lte } from "drizzle-orm";
 import { EmbedSuppressor } from "./types";
 import { failedSuppresses } from "../database/schema";
 
-const INSURANCE_SUPPRESS_DELAY_MS = 1500;
+const INSURANCE_SUPPRESS_DELAY_MS = 2000;
 const FAILED_SUPPRESS_TTL_MS = 5 * 60 * 1000;
-const SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+const SWEEP_INTERVAL_MS = 10 * 60 * 1000;
 
 const CHANNEL_TYPE_NAMES: Partial<Record<ChannelType, string>> = {
   [ChannelType.GuildText]: "GuildText",
