@@ -68,6 +68,10 @@ podman compose logs -f
 # Update to latest image
 podman compose pull && podman compose up -d
 
+# Roll back to a specific version
+# Edit compose.yaml: change :latest to a version tag (e.g. :1.0.47)
+podman compose pull && podman compose up -d
+
 # Stop
 podman compose down
 ```
