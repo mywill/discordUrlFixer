@@ -1,4 +1,5 @@
 import { EmbedFixer, FixRequest, FixResult } from "./types";
+import { ServerConfig } from "../config-repo/types";
 
 export class RedditFixer implements EmbedFixer {
   private readonly pattern = /^https?:\/\/(www\.|old\.|new\.)?reddit\.com\//;
@@ -10,52 +11,47 @@ export class RedditFixer implements EmbedFixer {
 
   fix(request: FixRequest): FixResult | Promise<FixResult> {
     if (this.isShortlink.test(new URL(request.url).pathname)) {
-      return this.resolveAndFix(request.url);
+      return this.resolveAndFix(request);
     }
 
-    const parsed = new URL(request.url);
+    return this.fixUrl(request.url, request.serverConfig);
+  }
 
+  private async resolveAndFix(request: FixRequest): Promise<FixResult> {
+    try {
+      const response = await fetch(request.url, {
+        method: "HEAD",
+        redirect: "manual",
+      });
+      const location = response.headers.get("location");
+      if (!location) {
+        console.warn(
+          `No redirect for ${request.url} (status ${response.status}), using original URL`,
+        );
+        return this.fixUrl(request.url, request.serverConfig);
+      }
+      const resolvedUrl = new URL(location);
+      resolvedUrl.search = "";
+      return this.fixUrl(resolvedUrl.toString(), request.serverConfig);
+    } catch (error) {
+      console.warn(`Failed to resolve redirect for ${request.url}:`, error);
+      return this.fixUrl(request.url, request.serverConfig);
+    }
+  }
+
+  private fixUrl(url: string, serverConfig: ServerConfig): FixResult {
+    const parsed = new URL(url);
     parsed.hostname = "vxreddit.com";
 
     const result: FixResult = { url: parsed.toString(), source: "reddit" };
 
-    if (request.serverConfig.reddit?.includeOldRedditLink !== false) {
-      const oldParsed = new URL(request.url);
+    if (serverConfig.reddit?.includeOldRedditLink !== false) {
+      const oldParsed = new URL(url);
       oldParsed.hostname = "old.reddit.com";
       result.secondaryUrl = oldParsed.toString();
       result.secondarySource = "oldReddit";
     }
 
     return result;
-  }
-
-  private async resolveAndFix(url: string): Promise<FixResult> {
-    // HEAD request to follow redirect
-    console.log(`getting redirect for ${url}`);
-    const response = await fetch(url, {
-      method: "HEAD",
-      redirect: "manual", // or use 'follow' and check finalURL
-    });
-    // TODO make this better should not silently fail...
-    console.log(
-      `made request for redirect for ${url} got ${response.status} ${JSON.stringify(response.headers)}`,
-    );
-    // Reddit returns 301/302 to the real permalink
-    const realUrl = new URL(response.headers.get("location") || response.url);
-    realUrl.search = "";
-    console.log(`got redirect for ${url} resolves ${realUrl}`);
-    // Now apply your transformations to the resolved URL
-    const vxUrl = new URL(realUrl);
-    vxUrl.hostname = "vxreddit.com";
-
-    const oldUrl = new URL(realUrl);
-    oldUrl.hostname = "old.reddit.com";
-
-    return {
-      url: vxUrl.toString(),
-      source: "vxreddit",
-      secondaryUrl: oldUrl.toString(),
-      secondarySource: "oldReddit",
-    };
   }
 }
