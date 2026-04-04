@@ -1,3 +1,4 @@
+minimumReleaseAge: 10080
 allowBuilds:
-  better-sqlite3: false
-  esbuild: false
+  better-sqlite3: true
+  esbuild: true
