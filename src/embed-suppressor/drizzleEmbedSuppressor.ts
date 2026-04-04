@@ -122,9 +122,10 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
       if (!this.pending.has(message.id)) return;
       try {
         await message.suppressEmbeds(true);
-        console.log(`Insurance suppress fired for ${message.id}`);
-      } catch {
-        // best effort — messageUpdate handler is the real safety net
+        this.untrack(message.id);
+        console.log(`Insurance suppress confirmed for ${message.id}`);
+      } catch (error) {
+        console.warn(`Insurance suppress failed for ${message.id}:`, error);
       }
     });
   }
@@ -143,8 +144,11 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
         try {
           const full = newMessage.partial ? await newMessage.fetch() : newMessage;
           await full.suppressEmbeds(true);
-        } catch {
-          // Flag already set — best effort re-assert
+        } catch (error) {
+          console.warn(
+            `Defensive re-suppress failed for ${newMessage.id} in #${channelName}:`,
+            error,
+          );
         }
         this.untrack(newMessage.id);
         console.log(`Confirmed embeds suppressed for ${newMessage.id} in #${channelName}`);
@@ -160,6 +164,9 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
     try {
       const full = newMessage.partial ? await newMessage.fetch() : newMessage;
       if (full.flags.has(MessageFlags.SuppressEmbeds)) {
+        console.log(
+          `Flag already set on fetch for ${newMessage.id} in #${channelName}, untracking`,
+        );
         this.untrack(newMessage.id);
         return;
       }
@@ -208,13 +215,21 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
       .where(lte(failedSuppresses.createdAt, cutoff))
       .run();
     if (deleted.changes > 0) {
+      const swept = [...this.pending].filter((id) => {
+        const exists = this.db
+          .select()
+          .from(failedSuppresses)
+          .where(eq(failedSuppresses.messageId, id))
+          .all();
+        return exists.length === 0;
+      });
       this.pending.clear();
       const remaining = this.db.select().from(failedSuppresses).all();
       for (const row of remaining) {
         this.pending.add(row.messageId);
       }
       console.log(
-        `Sweep: removed ${deleted.changes} expired entry/entries (${before} → ${this.pending.size} pending)`,
+        `Sweep: removed ${deleted.changes} expired entry/entries [${swept.join(", ")}] (${before} → ${this.pending.size} pending)`,
       );
     } else {
       console.log(`Sweep: no expired entries (${before} pending)`);

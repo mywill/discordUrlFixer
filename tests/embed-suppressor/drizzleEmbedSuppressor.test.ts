@@ -187,18 +187,20 @@ describe("DrizzleEmbedSuppressor", () => {
       warnSpy.mockRestore();
     });
 
-    it("fires insurance suppress after delay", async () => {
+    it("fires insurance suppress after delay and untracks", async () => {
       const message = createFakeMessage("msg-1");
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
       await suppressor.suppress(message);
       expect(message.suppressEmbeds).toHaveBeenCalledTimes(1);
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(1);
 
       await vi.advanceTimersByTimeAsync(2500);
 
-      // Insurance call fires because message is still pending
+      // Insurance call fires, re-suppresses, and untracks
       expect(message.suppressEmbeds).toHaveBeenCalledTimes(2);
-      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Insurance suppress fired"));
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Insurance suppress confirmed"));
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
       logSpy.mockRestore();
     });
 
