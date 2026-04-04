@@ -1,5 +1,7 @@
 import { EmbedFixer, FixRequest, FixResult } from "./types";
 
+const DEFAULT_EMBED_DOMAIN = "fixupx.com";
+
 export class XFixer implements EmbedFixer {
   private readonly pattern = /^https?:\/\/(www\.)?x\.com\//;
 
@@ -9,7 +11,7 @@ export class XFixer implements EmbedFixer {
 
   fix(request: FixRequest): FixResult {
     const parsed = new URL(request.url);
-    parsed.hostname = "fixupx.com";
+    parsed.hostname = process.env.X_EMBED_DOMAIN ?? DEFAULT_EMBED_DOMAIN;
 
     let fixedUrl = parsed.toString();
 

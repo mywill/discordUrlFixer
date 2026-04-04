@@ -1,8 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { BlueskyFixer } from "../../src/fixers/blueskyFixer";
 
 describe("BlueskyFixer", () => {
   const fixer = new BlueskyFixer();
+
+  afterEach(() => {
+    delete process.env.BLUESKY_EMBED_DOMAIN;
+  });
 
   describe("canHandle", () => {
     it("returns true for bsky.app URLs", () => {
@@ -53,6 +57,15 @@ describe("BlueskyFixer", () => {
         serverConfig: {},
       });
       expect(result.source).toBe("bluesky");
+    });
+
+    it("uses BLUESKY_EMBED_DOMAIN env var when set", () => {
+      process.env.BLUESKY_EMBED_DOMAIN = "bskyx.app";
+      const result = fixer.fix({
+        url: "https://bsky.app/profile/user/post/789",
+        serverConfig: {},
+      });
+      expect(result.url).toBe("https://bskyx.app/profile/user/post/789");
     });
   });
 });

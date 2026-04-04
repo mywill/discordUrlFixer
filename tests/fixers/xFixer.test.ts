@@ -1,8 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { XFixer } from "../../src/fixers/xFixer";
 
 describe("XFixer", () => {
   const fixer = new XFixer();
+
+  afterEach(() => {
+    delete process.env.X_EMBED_DOMAIN;
+  });
 
   describe("canHandle", () => {
     it("returns true for x.com URLs", () => {
@@ -81,6 +85,15 @@ describe("XFixer", () => {
         serverConfig: {},
       });
       expect(result.source).toBe("twitter");
+    });
+
+    it("uses X_EMBED_DOMAIN env var when set", () => {
+      process.env.X_EMBED_DOMAIN = "fixvx.com";
+      const result = fixer.fix({
+        url: "https://x.com/user/status/123",
+        serverConfig: { twitter: { language: "" } },
+      });
+      expect(result.url).toBe("https://fixvx.com/user/status/123");
     });
   });
 });

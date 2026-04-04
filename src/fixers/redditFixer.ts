@@ -1,6 +1,8 @@
 import { EmbedFixer, FixRequest, FixResult } from "./types";
 import { ServerConfig } from "../config-repo/types";
 
+const DEFAULT_EMBED_DOMAIN = "vxreddit.com";
+
 export class RedditFixer implements EmbedFixer {
   private readonly pattern = /^https?:\/\/(www\.|old\.|new\.)?reddit\.com\//;
   private isShortlink = /\/s\/[A-Za-z0-9]+/;
@@ -41,7 +43,7 @@ export class RedditFixer implements EmbedFixer {
 
   private fixUrl(url: string, serverConfig: ServerConfig): FixResult {
     const parsed = new URL(url);
-    parsed.hostname = "vxreddit.com";
+    parsed.hostname = process.env.REDDIT_EMBED_DOMAIN ?? DEFAULT_EMBED_DOMAIN;
 
     const result: FixResult = { url: parsed.toString(), source: "reddit" };
 

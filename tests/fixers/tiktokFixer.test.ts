@@ -1,8 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { TikTokFixer } from "../../src/fixers/tiktokFixer";
 
 describe("TikTokFixer", () => {
   const fixer = new TikTokFixer();
+
+  afterEach(() => {
+    delete process.env.TIKTOK_EMBED_DOMAIN;
+  });
 
   describe("canHandle", () => {
     it("returns true for tiktok.com URLs", () => {
@@ -57,6 +61,15 @@ describe("TikTokFixer", () => {
         serverConfig: {},
       });
       expect(result.source).toBe("tiktok");
+    });
+
+    it("uses TIKTOK_EMBED_DOMAIN env var when set", () => {
+      process.env.TIKTOK_EMBED_DOMAIN = "vxtiktok.com";
+      const result = fixer.fix({
+        url: "https://tiktok.com/@user/video/123",
+        serverConfig: {},
+      });
+      expect(result.url).toBe("https://vxtiktok.com/@user/video/123");
     });
   });
 });

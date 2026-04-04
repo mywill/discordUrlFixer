@@ -1,5 +1,7 @@
 import { EmbedFixer, FixRequest, FixResult } from "./types";
 
+const DEFAULT_EMBED_DOMAIN = "fxtwitter.com";
+
 export class TwitterFixer implements EmbedFixer {
   private readonly pattern = /^https?:\/\/(www\.)?twitter\.com\//;
 
@@ -9,9 +11,10 @@ export class TwitterFixer implements EmbedFixer {
 
   fix(request: FixRequest): FixResult {
     const parsed = new URL(request.url);
-    parsed.hostname = "fxtwitter.com";
-    if (parsed.hostname === "fxtwitter.com" && parsed.host.startsWith("www.")) {
-      parsed.hostname = "fxtwitter.com";
+    const embedDomain = process.env.TWITTER_EMBED_DOMAIN ?? DEFAULT_EMBED_DOMAIN;
+    parsed.hostname = embedDomain;
+    if (parsed.host.startsWith("www.")) {
+      parsed.hostname = embedDomain;
     }
 
     let fixedUrl = parsed.toString();

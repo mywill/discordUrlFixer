@@ -1,8 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { TwitterFixer } from "../../src/fixers/twitterFixer";
 
 describe("TwitterFixer", () => {
   const fixer = new TwitterFixer();
+
+  afterEach(() => {
+    delete process.env.TWITTER_EMBED_DOMAIN;
+  });
 
   describe("canHandle", () => {
     it("returns true for twitter.com URLs", () => {
@@ -93,6 +97,15 @@ describe("TwitterFixer", () => {
         serverConfig: {},
       });
       expect(result.source).toBe("twitter");
+    });
+
+    it("uses TWITTER_EMBED_DOMAIN env var when set", () => {
+      process.env.TWITTER_EMBED_DOMAIN = "vxtwitter.com";
+      const result = fixer.fix({
+        url: "https://twitter.com/user/status/123",
+        serverConfig: { twitter: { language: "" } },
+      });
+      expect(result.url).toBe("https://vxtwitter.com/user/status/123");
     });
   });
 });

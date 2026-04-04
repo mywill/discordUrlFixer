@@ -116,6 +116,27 @@ The config shape per server (JSON format for reference):
 | `reddit.includeOldRedditLink` | `true` | Append an `old.reddit.com` link alongside the embed-fixed URL. Set to `false` to disable. |
 | `useMarkdownLinksAsShortener` | `true` | Format replies as `[source](url)` for shorter messages. Set to `false` for raw URLs. |
 
+### Embed Service Overrides
+
+Each embed service domain can be overridden via environment variables. This is useful when a third-party service goes down and you need to swap to an alternative without changing code.
+
+| Env var | Default | Known alternatives |
+|---|---|---|
+| `TWITTER_EMBED_DOMAIN` | `fxtwitter.com` | `vxtwitter.com` |
+| `X_EMBED_DOMAIN` | `fixupx.com` | `fixvx.com` |
+| `BLUESKY_EMBED_DOMAIN` | `fxbsky.app` | |
+| `TIKTOK_EMBED_DOMAIN` | `tnktok.com` | `vxtiktok.com`, `tfxktok.com` |
+| `REDDIT_EMBED_DOMAIN` | `vxreddit.com` | `rxyddit.com`, `rxddit.com` |
+
+To override in Docker Compose, uncomment and edit the `environment` block in `compose.yaml`:
+
+```yaml
+environment:
+  REDDIT_EMBED_DOMAIN: rxyddit.com
+```
+
+Then restart: `podman compose up -d`
+
 ## Development
 
 ```bash

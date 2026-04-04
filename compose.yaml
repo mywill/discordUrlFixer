@@ -4,6 +4,13 @@ services:
     container_name: twitter-fixer
     restart: unless-stopped
     env_file: .env
+    environment:
+      # Embed service domains — uncomment to override defaults
+      # TWITTER_EMBED_DOMAIN: fxtwitter.com
+      # X_EMBED_DOMAIN: fixupx.com
+      # BLUESKY_EMBED_DOMAIN: fxbsky.app
+      # TIKTOK_EMBED_DOMAIN: tnktok.com
+      # REDDIT_EMBED_DOMAIN: vxreddit.com
     volumes:
       - ./data:/app/data
       - ./server-config.json:/app/server-config.json

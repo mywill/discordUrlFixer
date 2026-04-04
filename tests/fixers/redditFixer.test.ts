@@ -6,6 +6,7 @@ describe("RedditFixer", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    delete process.env.REDDIT_EMBED_DOMAIN;
   });
 
   describe("canHandle", () => {
@@ -201,6 +202,15 @@ describe("RedditFixer", () => {
 
       expect(result.url).toBe("https://vxreddit.com/r/MLS/comments/1sajlvv/title/");
       expect(result.secondaryUrl).toBeUndefined();
+    });
+
+    it("uses REDDIT_EMBED_DOMAIN env var when set", async () => {
+      process.env.REDDIT_EMBED_DOMAIN = "rxyddit.com";
+      const result = await fixer.fix({
+        url: "https://reddit.com/r/funny/comments/abc123/title/",
+        serverConfig: {},
+      });
+      expect(result.url).toBe("https://rxyddit.com/r/funny/comments/abc123/title/");
     });
   });
 });
