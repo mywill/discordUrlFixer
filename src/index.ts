@@ -42,6 +42,7 @@ const client = new Client({
 
 client.once("clientReady", async (c) => {
   console.log(`Logged in as ${c.user.tag}`);
+  embedSuppressor.setClient(c);
   await embedSuppressor.resumePending(c);
 });
 

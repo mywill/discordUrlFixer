@@ -561,7 +561,7 @@ describe("DrizzleEmbedSuppressor", () => {
       expect(db.select().from(failedSuppresses).all()).toHaveLength(1);
 
       vi.advanceTimersByTime(5 * 60 * 1000);
-      suppressor.sweep();
+      await suppressor.sweep();
 
       expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Sweep: removed 1"));
@@ -569,13 +569,129 @@ describe("DrizzleEmbedSuppressor", () => {
       warnSpy.mockRestore();
     });
 
-    it("logs when no entries expired", () => {
+    it("logs when no entries expired", async () => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-      suppressor.sweep();
+      await suppressor.sweep();
 
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Sweep: no expired entries"));
       logSpy.mockRestore();
+    });
+
+    it("attempts last-ditch suppress when client is set", async () => {
+      const error = createError50013();
+      const message = createFakeMessage("msg-1", {
+        suppressEmbeds: vi.fn().mockRejectedValue(error),
+      });
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      await suppressor.suppress(message);
+
+      const mockSweepMessage: any = {
+        id: "msg-1",
+        flags: { has: () => false },
+        suppressEmbeds: vi.fn().mockResolvedValue(undefined),
+      };
+      const mockChannel: any = {
+        id: "channel-1",
+        isTextBased: () => true,
+        messages: { fetch: vi.fn().mockResolvedValue(mockSweepMessage) },
+      };
+      const mockClient: any = {
+        channels: { fetch: vi.fn().mockResolvedValue(mockChannel) },
+      };
+      suppressor.setClient(mockClient);
+
+      vi.advanceTimersByTime(5 * 60 * 1000);
+      await suppressor.sweep();
+
+      expect(mockSweepMessage.suppressEmbeds).toHaveBeenCalledWith(true);
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("last-ditch suppress succeeded"));
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
+      logSpy.mockRestore();
+      warnSpy.mockRestore();
+    });
+
+    it("skips last-ditch when embeds already suppressed", async () => {
+      const error = createError50013();
+      const message = createFakeMessage("msg-1", {
+        suppressEmbeds: vi.fn().mockRejectedValue(error),
+      });
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      await suppressor.suppress(message);
+
+      const mockSweepMessage: any = {
+        id: "msg-1",
+        flags: { has: (flag: number) => flag === MessageFlags.SuppressEmbeds },
+        suppressEmbeds: vi.fn(),
+      };
+      const mockChannel: any = {
+        id: "channel-1",
+        isTextBased: () => true,
+        messages: { fetch: vi.fn().mockResolvedValue(mockSweepMessage) },
+      };
+      const mockClient: any = {
+        channels: { fetch: vi.fn().mockResolvedValue(mockChannel) },
+      };
+      suppressor.setClient(mockClient);
+
+      vi.advanceTimersByTime(5 * 60 * 1000);
+      await suppressor.sweep();
+
+      expect(mockSweepMessage.suppressEmbeds).not.toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("already suppressed"));
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
+      logSpy.mockRestore();
+      warnSpy.mockRestore();
+    });
+
+    it("cleans up even when last-ditch suppress fails", async () => {
+      const error = createError50013();
+      const message = createFakeMessage("msg-1", {
+        suppressEmbeds: vi.fn().mockRejectedValue(error),
+      });
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      await suppressor.suppress(message);
+
+      const mockClient: any = {
+        channels: { fetch: vi.fn().mockRejectedValue(new Error("Unknown Channel")) },
+      };
+      suppressor.setClient(mockClient);
+
+      vi.advanceTimersByTime(5 * 60 * 1000);
+      await suppressor.sweep();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("last-ditch suppress failed"),
+        expect.anything(),
+      );
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
+      logSpy.mockRestore();
+      warnSpy.mockRestore();
+    });
+
+    it("cleans up without last-ditch when no client set", async () => {
+      const error = createError50013();
+      const message = createFakeMessage("msg-1", {
+        suppressEmbeds: vi.fn().mockRejectedValue(error),
+      });
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      await suppressor.suppress(message);
+
+      vi.advanceTimersByTime(5 * 60 * 1000);
+      await suppressor.sweep();
+
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Sweep: removed 1"));
+      logSpy.mockRestore();
+      warnSpy.mockRestore();
     });
   });
 });

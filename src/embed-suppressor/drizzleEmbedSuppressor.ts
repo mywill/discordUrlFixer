@@ -13,7 +13,7 @@ import { failedSuppresses } from "../database/schema";
 
 const INSURANCE_SUPPRESS_DELAY_MS = 2000;
 const FAILED_SUPPRESS_TTL_MS = 5 * 60 * 1000;
-const SWEEP_INTERVAL_MS = 10 * 60 * 1000;
+const SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
 const CHANNEL_TYPE_NAMES: Partial<Record<ChannelType, string>> = {
   [ChannelType.GuildText]: "GuildText",
@@ -90,10 +90,15 @@ function getPermissionDiagnostics(message: Message): string {
 export class DrizzleEmbedSuppressor implements EmbedSuppressor {
   private pending = new Set<string>();
   private sweepInterval: ReturnType<typeof setInterval>;
+  private client: Client | null = null;
 
   constructor(private db: BetterSQLite3Database) {
     this.sweepInterval = setInterval(() => this.sweep(), SWEEP_INTERVAL_MS);
     this.sweepInterval.unref();
+  }
+
+  setClient(client: Client): void {
+    this.client = client;
   }
 
   async suppress(message: Message): Promise<void> {
@@ -207,33 +212,45 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
     }
   }
 
-  sweep(): void {
+  async sweep(): Promise<void> {
     const before = this.pending.size;
     const cutoff = Date.now() - FAILED_SUPPRESS_TTL_MS;
-    const deleted = this.db
-      .delete(failedSuppresses)
+    const expired = this.db
+      .select()
+      .from(failedSuppresses)
       .where(lte(failedSuppresses.createdAt, cutoff))
-      .run();
-    if (deleted.changes > 0) {
-      const swept = [...this.pending].filter((id) => {
-        const exists = this.db
-          .select()
-          .from(failedSuppresses)
-          .where(eq(failedSuppresses.messageId, id))
-          .all();
-        return exists.length === 0;
-      });
-      this.pending.clear();
-      const remaining = this.db.select().from(failedSuppresses).all();
-      for (const row of remaining) {
-        this.pending.add(row.messageId);
-      }
-      console.log(
-        `Sweep: removed ${deleted.changes} expired entry/entries [${swept.join(", ")}] (${before} → ${this.pending.size} pending)`,
-      );
-    } else {
+      .all();
+
+    if (expired.length === 0) {
       console.log(`Sweep: no expired entries (${before} pending)`);
+      return;
     }
+
+    for (const entry of expired) {
+      if (this.client) {
+        try {
+          const channel = await this.client.channels.fetch(entry.channelId);
+          if (channel?.isTextBased()) {
+            const message = await channel.messages.fetch(entry.messageId);
+            if (!message.flags.has(MessageFlags.SuppressEmbeds)) {
+              await message.suppressEmbeds(true);
+              console.log(`Sweep: last-ditch suppress succeeded for ${entry.messageId}`);
+            } else {
+              console.log(`Sweep: embeds already suppressed for ${entry.messageId}`);
+            }
+          }
+        } catch (error) {
+          console.warn(`Sweep: last-ditch suppress failed for ${entry.messageId}:`, error);
+        }
+      }
+
+      this.db.delete(failedSuppresses).where(eq(failedSuppresses.messageId, entry.messageId)).run();
+      this.pending.delete(entry.messageId);
+    }
+
+    console.log(
+      `Sweep: removed ${expired.length} expired entry/entries [${expired.map((e) => e.messageId).join(", ")}] (${before} → ${this.pending.size} pending)`,
+    );
   }
 
   destroy(): void {
