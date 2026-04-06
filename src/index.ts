@@ -37,7 +37,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
   ],
-  partials: [Partials.Message],
+  partials: [Partials.Message, Partials.Channel],
 });
 
 client.once("clientReady", async (c) => {
@@ -51,8 +51,8 @@ client.on(
   createMessageHandler(registry, configRepo, replyTracker, embedSuppressor),
 );
 client.on("messageUpdate", (old, updated) => embedSuppressor.handleMessageUpdate(old, updated));
-client.on("messageDelete", createMessageDeleteHandler(replyTracker));
-client.on("messageDeleteBulk", createMessageDeleteBulkHandler(replyTracker));
+client.on("messageDelete", createMessageDeleteHandler(replyTracker, embedSuppressor));
+client.on("messageDeleteBulk", createMessageDeleteBulkHandler(replyTracker, embedSuppressor));
 
 process.on("SIGTERM", () => {
   embedSuppressor.destroy();

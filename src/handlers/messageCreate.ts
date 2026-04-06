@@ -39,15 +39,22 @@ export function createMessageHandler(
       })
       .join("\n");
 
-    const [, replyResult] = await Promise.allSettled([
-      suppressor.suppress(message),
-      message.reply({ content: reply, allowedMentions: { repliedUser: false } }),
-    ]);
+    // Reply first, then suppress — avoids Discord bug where replying to a
+    // suppress-flagged message inherits SUPPRESS_EMBEDS on the reply
+    try {
+      const botReply = await message.reply({
+        content: reply,
+        allowedMentions: { repliedUser: false },
+      });
+      replyTracker.track(message.id, botReply.id);
+    } catch (error) {
+      console.error("Failed to reply:", error);
+    }
 
-    if (replyResult.status === "fulfilled") {
-      replyTracker.track(message.id, replyResult.value.id);
-    } else {
-      console.error("Failed to reply:", replyResult.reason);
+    try {
+      await suppressor.suppress(message);
+    } catch (error) {
+      console.error("Failed to suppress:", error);
     }
   };
 }

@@ -68,6 +68,8 @@ function createMockSuppressor(): EmbedSuppressor & { suppress: ReturnType<typeof
   return {
     suppress: vi.fn().mockResolvedValue(undefined),
     handleMessageUpdate: vi.fn().mockResolvedValue(undefined),
+    setClient: vi.fn(),
+    untrackIfPending: vi.fn(),
     resumePending: vi.fn().mockResolvedValue(undefined),
     destroy: vi.fn(),
   };

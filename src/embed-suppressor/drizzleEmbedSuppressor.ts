@@ -102,6 +102,17 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
   }
 
   async suppress(message: Message): Promise<void> {
+    const channel = message.channel;
+    if ("permissionsFor" in channel && message.guild?.members.me) {
+      const perms = channel.permissionsFor(message.guild.members.me);
+      if (perms && !perms.has(PermissionFlagsBits.ManageMessages)) {
+        console.warn(
+          `Skipping suppress for ${message.id} in ${formatChannelContext(message)}: bot lacks ManageMessages`,
+        );
+        return;
+      }
+    }
+
     this.track(message);
 
     try {
@@ -222,7 +233,9 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
       .all();
 
     if (expired.length === 0) {
-      console.log(`Sweep: no expired entries (${before} pending)`);
+      if (before > 0) {
+        console.log(`Sweep: no expired entries (${before} pending)`);
+      }
       return;
     }
 
@@ -272,6 +285,12 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
       })
       .run();
     console.log(`Tracking suppress for message ${message.id} (${this.pending.size} pending)`);
+  }
+
+  untrackIfPending(messageId: string): void {
+    if (!this.pending.has(messageId)) return;
+    this.untrack(messageId);
+    console.log(`Untracked deleted message ${messageId}`);
   }
 
   private untrack(messageId: string): void {

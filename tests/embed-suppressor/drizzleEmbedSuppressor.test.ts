@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ChannelType, MessageFlags } from "discord.js";
+import { ChannelType, MessageFlags, PermissionFlagsBits } from "discord.js";
 import Database from "better-sqlite3";
 import { drizzle, BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
@@ -95,6 +95,40 @@ describe("DrizzleEmbedSuppressor", () => {
 
       expect(message.suppressEmbeds).toHaveBeenCalledTimes(1);
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Suppress flag set"));
+      logSpy.mockRestore();
+    });
+
+    it("skips suppress when bot lacks ManageMessages", async () => {
+      const message = createFakeMessage("msg-1");
+      const botMember = { id: "bot-1" };
+      message.guild = { name: "Test Server", members: { me: botMember } };
+      message.channel.permissionsFor = (member: any) => ({
+        has: (flag: bigint) => flag !== PermissionFlagsBits.ManageMessages,
+      });
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      await suppressor.suppress(message);
+
+      expect(message.suppressEmbeds).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("bot lacks ManageMessages"));
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
+      warnSpy.mockRestore();
+      logSpy.mockRestore();
+    });
+
+    it("proceeds with suppress when bot has ManageMessages", async () => {
+      const message = createFakeMessage("msg-1");
+      const botMember = { id: "bot-1" };
+      message.guild = { name: "Test Server", members: { me: botMember } };
+      message.channel.permissionsFor = () => ({
+        has: () => true,
+      });
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      await suppressor.suppress(message);
+
+      expect(message.suppressEmbeds).toHaveBeenCalledTimes(1);
       logSpy.mockRestore();
     });
 
@@ -569,12 +603,27 @@ describe("DrizzleEmbedSuppressor", () => {
       warnSpy.mockRestore();
     });
 
-    it("logs when no entries expired", async () => {
+    it("is silent when idle with no pending entries", async () => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
       await suppressor.sweep();
 
-      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Sweep: no expired entries"));
+      expect(logSpy).not.toHaveBeenCalledWith(expect.stringContaining("Sweep:"));
+      logSpy.mockRestore();
+    });
+
+    it("logs when pending entries exist but none expired", async () => {
+      const message = createFakeMessage("msg-1");
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      await suppressor.suppress(message);
+
+      // Don't advance time — entry not expired yet
+      await suppressor.sweep();
+
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Sweep: no expired entries (1 pending)"),
+      );
       logSpy.mockRestore();
     });
 
@@ -692,6 +741,32 @@ describe("DrizzleEmbedSuppressor", () => {
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Sweep: removed 1"));
       logSpy.mockRestore();
       warnSpy.mockRestore();
+    });
+  });
+
+  describe("untrackIfPending", () => {
+    it("untracks a pending message", async () => {
+      const message = createFakeMessage("msg-1");
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      await suppressor.suppress(message);
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(1);
+
+      suppressor.untrackIfPending("msg-1");
+
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Untracked deleted message"));
+      logSpy.mockRestore();
+    });
+
+    it("is a no-op for non-pending messages", () => {
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      suppressor.untrackIfPending("unknown-id");
+
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
+      expect(logSpy).not.toHaveBeenCalledWith(expect.stringContaining("Untracked deleted"));
+      logSpy.mockRestore();
     });
   });
 });

@@ -7,6 +7,7 @@ export interface EmbedSuppressor {
     newMessage: Message | PartialMessage,
   ): Promise<void>;
   setClient(client: Client): void;
+  untrackIfPending(messageId: string): void;
   resumePending(client: Client): Promise<void>;
   destroy(): void;
 }

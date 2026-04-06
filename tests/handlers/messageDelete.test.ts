@@ -1,10 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Collection } from "discord.js";
 import { InMemoryReplyTracker } from "../../src/reply-tracker/inMemoryReplyTracker";
+import { EmbedSuppressor } from "../../src/embed-suppressor/types";
 import {
   createMessageDeleteHandler,
   createMessageDeleteBulkHandler,
 } from "../../src/handlers/messageDelete";
+
+function createMockSuppressor(): EmbedSuppressor {
+  return {
+    suppress: vi.fn().mockResolvedValue(undefined),
+    handleMessageUpdate: vi.fn().mockResolvedValue(undefined),
+    setClient: vi.fn(),
+    untrackIfPending: vi.fn(),
+    resumePending: vi.fn().mockResolvedValue(undefined),
+    destroy: vi.fn(),
+  };
+}
 
 function createFakeMessage(
   id: string,
@@ -30,10 +42,12 @@ function createFakeMessage(
 
 describe("messageDelete handler", () => {
   let tracker: InMemoryReplyTracker;
+  let suppressor: EmbedSuppressor;
 
   beforeEach(() => {
     vi.useFakeTimers();
     tracker = new InMemoryReplyTracker();
+    suppressor = createMockSuppressor();
   });
 
   afterEach(() => {
@@ -44,7 +58,7 @@ describe("messageDelete handler", () => {
   it("deletes bot reply when original is deleted and tracked", async () => {
     tracker.track("orig-1", "reply-1");
     const message = createFakeMessage("orig-1");
-    const handler = createMessageDeleteHandler(tracker);
+    const handler = createMessageDeleteHandler(tracker, suppressor);
 
     await handler(message);
 
@@ -55,7 +69,7 @@ describe("messageDelete handler", () => {
 
   it("is a no-op when message is not tracked", async () => {
     const message = createFakeMessage("unknown");
-    const handler = createMessageDeleteHandler(tracker);
+    const handler = createMessageDeleteHandler(tracker, suppressor);
 
     await handler(message);
 
@@ -65,7 +79,7 @@ describe("messageDelete handler", () => {
   it("does not crash when messages.fetch() throws", async () => {
     tracker.track("orig-1", "reply-1");
     const message = createFakeMessage("orig-1", { fetchThrows: true });
-    const handler = createMessageDeleteHandler(tracker);
+    const handler = createMessageDeleteHandler(tracker, suppressor);
 
     await expect(handler(message)).resolves.toBeUndefined();
   });
@@ -73,7 +87,7 @@ describe("messageDelete handler", () => {
   it("does not crash when delete() throws", async () => {
     tracker.track("orig-1", "reply-1");
     const message = createFakeMessage("orig-1", { deleteThrows: true });
-    const handler = createMessageDeleteHandler(tracker);
+    const handler = createMessageDeleteHandler(tracker, suppressor);
 
     await expect(handler(message)).resolves.toBeUndefined();
   });
@@ -81,7 +95,7 @@ describe("messageDelete handler", () => {
   it("removes entry from tracker after processing", async () => {
     tracker.track("orig-1", "reply-1");
     const message = createFakeMessage("orig-1");
-    const handler = createMessageDeleteHandler(tracker);
+    const handler = createMessageDeleteHandler(tracker, suppressor);
 
     await handler(message);
 
@@ -91,10 +105,12 @@ describe("messageDelete handler", () => {
 
 describe("messageDeleteBulk handler", () => {
   let tracker: InMemoryReplyTracker;
+  let suppressor: EmbedSuppressor;
 
   beforeEach(() => {
     vi.useFakeTimers();
     tracker = new InMemoryReplyTracker();
+    suppressor = createMockSuppressor();
   });
 
   afterEach(() => {
@@ -115,7 +131,7 @@ describe("messageDeleteBulk handler", () => {
     collection.set("orig-2", msg2);
     collection.set("orig-3", msg3);
 
-    const handler = createMessageDeleteBulkHandler(tracker);
+    const handler = createMessageDeleteBulkHandler(tracker, suppressor);
     await handler(collection);
 
     expect(msg1.channel.messages.fetch).toHaveBeenCalledWith("reply-1");
