@@ -110,6 +110,7 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
         console.warn(
           `Skipping suppress for ${message.id} in ${formatChannelContext(message)}: bot lacks ManageMessages`,
         );
+        console.log(`Suppress result: SKIPPED for ${message.id} — no ManageMessages`);
         return;
       }
     }
@@ -147,16 +148,28 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
       }
     });
 
-    // Final cleanup: untrack after enough time for Discord's embed resolver + messageUpdate
+    // Final cleanup: fetch message to verify actual state, re-suppress if needed
     delay(FINAL_CLEANUP_DELAY_MS).then(async () => {
       if (!this.pending.has(message.id)) return;
       try {
-        await message.suppressEmbeds(true);
+        const fresh = await message.fetch();
+        const embedCount = fresh.embeds.length;
+        const flagSet = fresh.flags.has(MessageFlags.SuppressEmbeds);
+
+        if (!flagSet) {
+          await fresh.suppressEmbeds(true);
+          console.log(
+            `Suppress result: LATE_FIX for ${message.id} — flag was unset at cleanup, embeds=${embedCount}, re-suppressed`,
+          );
+        } else {
+          console.log(
+            `Suppress result: OK for ${message.id} — verified at cleanup (flag=${flagSet}, embeds=${embedCount})`,
+          );
+        }
       } catch (error) {
-        console.warn(`Final cleanup suppress failed for ${message.id}:`, error);
+        console.warn(`Suppress result: ERROR for ${message.id} — cleanup failed:`, error);
       }
       this.untrack(message.id);
-      console.log(`Final cleanup completed for ${message.id}`);
     });
   }
 
@@ -182,6 +195,7 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
         }
         this.untrack(newMessage.id);
         console.log(`Confirmed embeds suppressed for ${newMessage.id} in #${channelName}`);
+        console.log(`Suppress result: OK for ${newMessage.id} — via messageUpdate (defensive)`);
       }
       // Flag set but no embeds yet — keep tracking
       return;
@@ -197,6 +211,7 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
         console.log(
           `Flag already set on fetch for ${newMessage.id} in #${channelName}, untracking`,
         );
+        console.log(`Suppress result: OK for ${newMessage.id} — flag verified on fetch`);
         this.untrack(newMessage.id);
         return;
       }
@@ -205,6 +220,7 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
       console.log(
         `Suppressed embeds via messageUpdate for ${full.id} in #${channelName} [${full.channel.id}]`,
       );
+      console.log(`Suppress result: OK for ${full.id} — via messageUpdate`);
     } catch (error) {
       // Stay tracked — next messageUpdate or sweep will handle cleanup
       console.warn(

@@ -112,6 +112,7 @@ describe("DrizzleEmbedSuppressor", () => {
 
       expect(message.suppressEmbeds).not.toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("bot lacks ManageMessages"));
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Suppress result: SKIPPED"));
       expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
       warnSpy.mockRestore();
       logSpy.mockRestore();
@@ -238,8 +239,14 @@ describe("DrizzleEmbedSuppressor", () => {
       logSpy.mockRestore();
     });
 
-    it("final cleanup untracks after 10s delay", async () => {
+    it("final cleanup verifies state and logs OK when flag is set", async () => {
       const message = createFakeMessage("msg-1");
+      message.fetch.mockResolvedValue({
+        ...message,
+        partial: false,
+        embeds: [],
+        flags: { has: (flag: number) => flag === MessageFlags.SuppressEmbeds },
+      });
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
       await suppressor.suppress(message);
@@ -247,9 +254,34 @@ describe("DrizzleEmbedSuppressor", () => {
 
       await vi.advanceTimersByTimeAsync(10500);
 
-      // Insurance (2s) + final cleanup (10s) both fired
-      expect(message.suppressEmbeds).toHaveBeenCalledTimes(3);
-      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Final cleanup completed"));
+      expect(message.fetch).toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Suppress result: OK for msg-1 — verified at cleanup"),
+      );
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
+      logSpy.mockRestore();
+    });
+
+    it("final cleanup logs LATE_FIX when flag is unset", async () => {
+      const message = createFakeMessage("msg-1");
+      const freshMessage = {
+        ...message,
+        partial: false,
+        embeds: [{ url: "https://twitter.com/user/status/123" }],
+        flags: { has: () => false },
+        suppressEmbeds: vi.fn().mockResolvedValue(undefined),
+      };
+      message.fetch.mockResolvedValue(freshMessage);
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      await suppressor.suppress(message);
+
+      await vi.advanceTimersByTimeAsync(10500);
+
+      expect(freshMessage.suppressEmbeds).toHaveBeenCalledWith(true);
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Suppress result: LATE_FIX for msg-1"),
+      );
       expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
       logSpy.mockRestore();
     });
@@ -300,21 +332,21 @@ describe("DrizzleEmbedSuppressor", () => {
       logSpy.mockRestore();
     });
 
-    it("final cleanup untracks even when suppress fails", async () => {
+    it("final cleanup untracks even when fetch fails", async () => {
       const message = createFakeMessage("msg-1");
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       await suppressor.suppress(message);
 
-      // Make subsequent suppress calls fail
-      message.suppressEmbeds.mockRejectedValue(new Error("Unknown Message"));
+      // Make fetch fail (e.g., message deleted)
+      message.fetch.mockRejectedValue(new Error("Unknown Message"));
 
       await vi.advanceTimersByTimeAsync(10500);
 
       // Should still untrack despite errors
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Final cleanup suppress failed"),
+        expect.stringContaining("Suppress result: ERROR for msg-1"),
         expect.anything(),
       );
       expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
@@ -406,6 +438,9 @@ describe("DrizzleEmbedSuppressor", () => {
 
       expect(updated.suppressEmbeds).toHaveBeenCalledWith(true);
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Confirmed embeds suppressed"));
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Suppress result: OK for msg-1 — via messageUpdate (defensive)"),
+      );
       const rows = db.select().from(failedSuppresses).all();
       expect(rows).toHaveLength(0);
       logSpy.mockRestore();
