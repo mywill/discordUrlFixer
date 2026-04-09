@@ -221,7 +221,7 @@ describe("DrizzleEmbedSuppressor", () => {
       warnSpy.mockRestore();
     });
 
-    it("fires insurance suppress after delay and untracks", async () => {
+    it("fires insurance suppress after delay without untracking", async () => {
       const message = createFakeMessage("msg-1");
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
@@ -231,14 +231,58 @@ describe("DrizzleEmbedSuppressor", () => {
 
       await vi.advanceTimersByTimeAsync(2500);
 
-      // Insurance call fires, re-suppresses, and untracks
+      // Insurance fires and re-suppresses but keeps tracking for messageUpdate
       expect(message.suppressEmbeds).toHaveBeenCalledTimes(2);
-      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Insurance suppress confirmed"));
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Insurance suppress fired"));
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(1);
+      logSpy.mockRestore();
+    });
+
+    it("final cleanup untracks after 10s delay", async () => {
+      const message = createFakeMessage("msg-1");
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      await suppressor.suppress(message);
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(1);
+
+      await vi.advanceTimersByTimeAsync(10500);
+
+      // Insurance (2s) + final cleanup (10s) both fired
+      expect(message.suppressEmbeds).toHaveBeenCalledTimes(3);
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Final cleanup completed"));
       expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
       logSpy.mockRestore();
     });
 
-    it("skips insurance suppress if already confirmed", async () => {
+    it("handles messageUpdate after insurance fires (race condition fix)", async () => {
+      const message = createFakeMessage("msg-1");
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      await suppressor.suppress(message);
+
+      // Insurance fires at 2s — re-suppresses but keeps tracking
+      await vi.advanceTimersByTimeAsync(2500);
+      expect(message.suppressEmbeds).toHaveBeenCalledTimes(2);
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(1);
+
+      // Discord's embed resolver finishes at 3s — messageUpdate with embeds, no flag
+      const updated = createFakeMessage("msg-1", { hasEmbeds: true, hasSuppressFlag: false });
+      await suppressor.handleMessageUpdate({} as any, updated);
+
+      // messageUpdate catches it because message is still pending
+      expect(updated.suppressEmbeds).toHaveBeenCalledWith(true);
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Suppressed embeds via messageUpdate"),
+      );
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
+
+      // Final cleanup at 10s should be a no-op (already untracked)
+      await vi.advanceTimersByTimeAsync(8000);
+      expect(message.suppressEmbeds).toHaveBeenCalledTimes(2);
+      logSpy.mockRestore();
+    });
+
+    it("skips insurance and final cleanup if already confirmed via messageUpdate", async () => {
       const message = createFakeMessage("msg-1");
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
@@ -249,11 +293,33 @@ describe("DrizzleEmbedSuppressor", () => {
       const updated = createFakeMessage("msg-1", { hasSuppressFlag: true, hasEmbeds: true });
       await suppressor.handleMessageUpdate({} as any, updated);
 
-      await vi.advanceTimersByTimeAsync(1500);
+      await vi.advanceTimersByTimeAsync(11000);
 
-      // Insurance should not have fired — only the initial call + the defensive re-suppress
+      // Neither insurance nor final cleanup should fire
       expect(message.suppressEmbeds).toHaveBeenCalledTimes(1);
       logSpy.mockRestore();
+    });
+
+    it("final cleanup untracks even when suppress fails", async () => {
+      const message = createFakeMessage("msg-1");
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      await suppressor.suppress(message);
+
+      // Make subsequent suppress calls fail
+      message.suppressEmbeds.mockRejectedValue(new Error("Unknown Message"));
+
+      await vi.advanceTimersByTimeAsync(10500);
+
+      // Should still untrack despite errors
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Final cleanup suppress failed"),
+        expect.anything(),
+      );
+      expect(db.select().from(failedSuppresses).all()).toHaveLength(0);
+      logSpy.mockRestore();
+      warnSpy.mockRestore();
     });
 
     it("does not schedule insurance on non-50013 error", async () => {

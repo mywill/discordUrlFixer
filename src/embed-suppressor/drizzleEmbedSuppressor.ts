@@ -12,6 +12,7 @@ import { EmbedSuppressor } from "./types";
 import { failedSuppresses } from "../database/schema";
 
 const INSURANCE_SUPPRESS_DELAY_MS = 2000;
+const FINAL_CLEANUP_DELAY_MS = 10_000;
 const FAILED_SUPPRESS_TTL_MS = 5 * 60 * 1000;
 const SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -134,15 +135,28 @@ export class DrizzleEmbedSuppressor implements EmbedSuppressor {
     }
 
     // Delayed insurance: re-assert suppress after Discord's embed resolver has likely finished
+    // Does NOT untrack — messageUpdate handler needs the message to stay pending
+    // to catch late-arriving embeds (Discord bug #4442: last-write-wins race)
     delay(INSURANCE_SUPPRESS_DELAY_MS).then(async () => {
       if (!this.pending.has(message.id)) return;
       try {
         await message.suppressEmbeds(true);
-        this.untrack(message.id);
-        console.log(`Insurance suppress confirmed for ${message.id}`);
+        console.log(`Insurance suppress fired for ${message.id}`);
       } catch (error) {
         console.warn(`Insurance suppress failed for ${message.id}:`, error);
       }
+    });
+
+    // Final cleanup: untrack after enough time for Discord's embed resolver + messageUpdate
+    delay(FINAL_CLEANUP_DELAY_MS).then(async () => {
+      if (!this.pending.has(message.id)) return;
+      try {
+        await message.suppressEmbeds(true);
+      } catch (error) {
+        console.warn(`Final cleanup suppress failed for ${message.id}:`, error);
+      }
+      this.untrack(message.id);
+      console.log(`Final cleanup completed for ${message.id}`);
     });
   }
 
