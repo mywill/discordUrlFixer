@@ -17,7 +17,7 @@
   "license": "MIT",
   "dependencies": {
     "better-sqlite3": "^12.11.1",
-    "discord.js": "^14.26.4",
+    "discord.js": "^14.27.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2"
   },
@@ -28,5 +28,5 @@
     "prettier": "^3.8.3",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }}
