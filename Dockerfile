@@ -12,6 +12,7 @@ RUN pnpm build
 # Runtime stage
 FROM node:24.19.0-alpine3.24
 WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN apk add --no-cache libstdc++ build-base python3 && \
     corepack enable && \
     pnpm install --frozen-lockfile --prod && \
