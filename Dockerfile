@@ -1,5 +1,5 @@
 # Build stage
-FROM node:24.19.0-alpine3.24 AS build
+FROM node:26.7.0-alpine3.24 AS build
 RUN apk add --no-cache build-base python3
 RUN corepack enable
 WORKDIR /app
@@ -10,7 +10,7 @@ COPY src/ src/
 RUN pnpm build
 
 # Runtime stage
-FROM node:24.19.0-alpine3.24
+FROM node:26.7.0-alpine3.24
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN apk add --no-cache libstdc++ build-base python3 && \
